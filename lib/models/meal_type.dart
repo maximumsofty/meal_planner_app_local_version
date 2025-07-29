@@ -3,19 +3,17 @@
 import 'dart:convert';
 
 /// Represents a meal category (breakfast, lunch, etc.)
-/// with default macro targets.
+/// with default macro targets (in grams).
 class MealType {
   final String id;
   String name;
-  int calories;
-  int carbs;   // in grams
-  int protein; // in grams
-  int fat;     // in grams
+  double carbs;   // in grams
+  double protein; // in grams
+  double fat;     // in grams
 
   MealType({
     required this.id,
     required this.name,
-    required this.calories,
     required this.carbs,
     required this.protein,
     required this.fat,
@@ -25,15 +23,13 @@ class MealType {
   MealType copyWith({
     String? id,
     String? name,
-    int? calories,
-    int? carbs,
-    int? protein,
-    int? fat,
+    double? carbs,
+    double? protein,
+    double? fat,
   }) {
     return MealType(
       id: id ?? this.id,
       name: name ?? this.name,
-      calories: calories ?? this.calories,
       carbs: carbs ?? this.carbs,
       protein: protein ?? this.protein,
       fat: fat ?? this.fat,
@@ -45,7 +41,6 @@ class MealType {
     return {
       'id': id,
       'name': name,
-      'calories': calories,
       'carbs': carbs,
       'protein': protein,
       'fat': fat,
@@ -57,10 +52,9 @@ class MealType {
     return MealType(
       id: json['id'] as String,
       name: json['name'] as String,
-      calories: json['calories'] as int,
-      carbs: json['carbs'] as int,
-      protein: json['protein'] as int,
-      fat: json['fat'] as int,
+      carbs: (json['carbs'] as num).toDouble(),
+      protein: (json['protein'] as num).toDouble(),
+      fat: (json['fat'] as num).toDouble(),
     );
   }
 

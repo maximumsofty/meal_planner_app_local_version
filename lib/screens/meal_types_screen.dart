@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../models/meal_type.dart';
 import '../services/meal_type_service.dart';
+import 'meal_type_form_screen.dart';
 
 class MealTypesScreen extends StatefulWidget {
   const MealTypesScreen({super.key});
@@ -18,7 +19,20 @@ class _MealTypesScreenState extends State<MealTypesScreen> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _load() {
     _mealTypesFuture = _service.loadMealTypes();
+  }
+
+  Future<void> _navigateToForm([MealType? existing]) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => MealTypeFormScreen(existing: existing),
+      ),
+    );
+    setState(_load);
   }
 
   @override
@@ -44,16 +58,20 @@ class _MealTypesScreenState extends State<MealTypesScreen> {
                 return ListTile(
                   title: Text(mt.name),
                   subtitle: Text(
-                    'Calories: ${mt.calories}, '
-                    'Carbs: ${mt.carbs}g • '
-                    'Protein: ${mt.protein}g • '
-                    'Fat: ${mt.fat}g',
+                    'Carbs: ${mt.carbs.toStringAsFixed(2)}g • '
+                    'Protein: ${mt.protein.toStringAsFixed(2)}g • '
+                    'Fat: ${mt.fat.toStringAsFixed(2)}g',
                   ),
+                  onTap: () => _navigateToForm(mt),
                 );
               },
             );
           }
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _navigateToForm(),
+        child: const Icon(Icons.add),
       ),
     );
   }
