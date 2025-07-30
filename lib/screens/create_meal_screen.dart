@@ -1,9 +1,6 @@
 // lib/screens/create_meal_screen.dart
 //
-// • Remaining bar shows totals of all rows
-// • Unlocked % fields are relative to (target − lockedUsed)
-// • Editing a % sets weight to that % of the *remaining* macro
-// • Locked rows read-only and displayed in separate section
+// Full Meal-Builder with independent auto-fillers for Carbs / Protein / Fat.
 
 import 'package:flutter/material.dart';
 import '../models/ingredient.dart';
@@ -20,15 +17,19 @@ class CreateMealScreen extends StatefulWidget {
 }
 
 class _CreateMealScreenState extends State<CreateMealScreen> {
-  // ── services & loads ──────────────────────────────────────────────────
+  // ─────────────────── services & initial loads ────────────────────────
   final _ingredientService = IngredientService();
   final _mealTypeService   = MealTypeService();
   late Future<List<Ingredient>> _allIngredientsFuture;
   late Future<List<MealType>>   _allMealTypesFuture;
 
-  // ── user selections ───────────────────────────────────────────────────
+  // ─────────────────── state ────────────────────────────────────────────
   MealType? _selectedMealType;
-  final List<MealIngredient> _mealIngredients = [];
+  final List<MealIngredient> _mainRows = [];  // user-added rows
+
+  MealIngredient? _fillerCarb;
+  MealIngredient? _fillerProtein;
+  MealIngredient? _fillerFat;
 
   @override
   void initState() {
@@ -37,43 +38,170 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     _allMealTypesFuture   = _mealTypeService.loadMealTypes();
   }
 
-  // ── helpers: locked / unlocked splits ─────────────────────────────────
-  Iterable<MealIngredient> get _locked   =>
-      _mealIngredients.where((mi) => mi.locked);
-  Iterable<MealIngredient> get _unlocked =>
-      _mealIngredients.where((mi) => !mi.locked);
+  // ─────────────────── helpers: lists & totals ─────────────────────────
+  Iterable<MealIngredient> get _lockedMain =>
+      _mainRows.where((mi) => mi.locked);
+  Iterable<MealIngredient> get _unlockedMain =>
+      _mainRows.where((mi) => !mi.locked);
 
-  // totals of *all* rows (drive Remaining bar)
+  List<MealIngredient> get _allFillers => [
+        if (_fillerCarb != null) _fillerCarb!,
+        if (_fillerProtein != null) _fillerProtein!,
+        if (_fillerFat != null) _fillerFat!,
+      ];
+
+  double _sumCarbs(Iterable<MealIngredient> rows) =>
+      rows.fold(0, (s, mi) => s + mi.carbs);
+  double _sumProt (Iterable<MealIngredient> rows) =>
+      rows.fold(0, (s, mi) => s + mi.protein);
+  double _sumFat  (Iterable<MealIngredient> rows) =>
+      rows.fold(0, (s, mi) => s + mi.fat);
+
   double get _usedCarbsTotal   =>
-      _mealIngredients.fold(0, (s, mi) => s + mi.carbs);
+      _sumCarbs(_mainRows) + _sumCarbs(_allFillers);
   double get _usedProteinTotal =>
-      _mealIngredients.fold(0, (s, mi) => s + mi.protein);
+      _sumProt(_mainRows) + _sumProt(_allFillers);
   double get _usedFatTotal     =>
-      _mealIngredients.fold(0, (s, mi) => s + mi.fat);
+      _sumFat (_mainRows) + _sumFat (_allFillers);
 
-  // totals of locked rows
-  double get _lockedCarbs   => _locked.fold(0, (s, mi) => s + mi.carbs);
-  double get _lockedProtein => _locked.fold(0, (s, mi) => s + mi.protein);
-  double get _lockedFat     => _locked.fold(0, (s, mi) => s + mi.fat);
+  double get _lockedCarbs   => _sumCarbs(_lockedMain);
+  double get _lockedProtein => _sumProt (_lockedMain);
+  double get _lockedFat     => _sumFat  (_lockedMain);
 
-  // remaining macros **after locked**
-  double _remainingAfterLocked(double target, double lockedUsed) =>
-      (target - lockedUsed).clamp(0, double.infinity);
+  double _remainAfterLocked(double target, double locked) =>
+      (target - locked).clamp(0, double.infinity);
 
-  // ── callbacks ─────────────────────────────────────────────────────────
-  void _onRowUpdated() => setState(() {});
+  // ─────────────────── filler utilities ────────────────────────────────
+  List<Ingredient> _singleMacro(List<Ingredient> all, String macro) {
+    const eps = 0.01;
+    bool ok(Ingredient i) {
+      switch (macro) {
+        case 'C':
+          return i.carbs > eps && i.protein <= eps && i.fat <= eps;
+        case 'P':
+          return i.protein > eps && i.carbs <= eps && i.fat <= eps;
+        case 'F':
+          return i.fat > eps && i.carbs <= eps && i.protein <= eps;
+      }
+      return false;
+    }
 
-  void _addIngredient(Ingredient ing) => setState(() =>
-      _mealIngredients.add(
-          MealIngredient(ingredient: ing, weight: ing.defaultWeight)));
+    return all.where(ok).toList();
+  }
 
-  void _toggleLock(MealIngredient mi) =>
-      setState(() => mi.locked = !mi.locked);
+  void _chooseFiller(String macro, Ingredient? ing) {
+    // remove old filler weight from totals
+    void _removeOld(MealIngredient? mi) {
+      if (mi != null) _allFillers.remove(mi);
+    }
 
-  void _removeIngredient(MealIngredient mi) =>
-      setState(() => _mealIngredients.remove(mi));
+    _removeOld(_fillerCarb);
+    _removeOld(_fillerProtein);
+    _removeOld(_fillerFat);
 
-  // ── UI ────────────────────────────────────────────────────────────────
+    MealIngredient? newMI;
+    if (ing != null) {
+      newMI = MealIngredient(ingredient: ing, weight: 0)..locked = true;
+    }
+
+    setState(() {
+      switch (macro) {
+        case 'C':
+          _fillerCarb = newMI;
+          break;
+        case 'P':
+          _fillerProtein = newMI;
+          break;
+        case 'F':
+          _fillerFat = newMI;
+          break;
+      }
+      _recalcFillerWeights();
+    });
+  }
+
+   // ───────────────── recalc filler weights (fixed types) ─────────────────
+void _recalcFillerWeights() {
+  if (_selectedMealType == null) return;
+
+  // Remaining = target − ALL main rows (locked + unlocked)
+  final double remC = (_selectedMealType!.carbs   -
+          _sumCarbs(_mainRows))
+      .clamp(0.0, double.infinity)
+      .toDouble();
+  final double remP = (_selectedMealType!.protein -
+          _sumProt(_mainRows))
+      .clamp(0.0, double.infinity)
+      .toDouble();
+  final double remF = (_selectedMealType!.fat     -
+          _sumFat(_mainRows))
+      .clamp(0.0, double.infinity)
+      .toDouble();
+
+  void setWeight(MealIngredient? mi, double remaining, double gramsPerGram) {
+    if (mi == null || gramsPerGram == 0.0) return;
+    mi.weight = double.parse((remaining / gramsPerGram).toStringAsFixed(1));
+  }
+
+  setWeight(
+    _fillerCarb,
+    remC,
+    _fillerCarb == null
+        ? 0.0
+        : _fillerCarb!.ingredient.carbs /
+            _fillerCarb!.ingredient.defaultWeight,
+  );
+
+  setWeight(
+    _fillerProtein,
+    remP,
+    _fillerProtein == null
+        ? 0.0
+        : _fillerProtein!.ingredient.protein /
+            _fillerProtein!.ingredient.defaultWeight,
+  );
+
+  setWeight(
+    _fillerFat,
+    remF,
+    _fillerFat == null
+        ? 0.0
+        : _fillerFat!.ingredient.fat /
+            _fillerFat!.ingredient.defaultWeight,
+  );
+}
+
+
+
+  // ─────────────────── row callbacks ────────────────────────────────────
+  void _onRowChanged() {
+    _recalcFillerWeights();
+    setState(() {});
+  }
+
+  void _addMainRow(Ingredient ing) {
+    setState(() {
+      _mainRows
+          .add(MealIngredient(ingredient: ing, weight: ing.defaultWeight));
+      _recalcFillerWeights();
+    });
+  }
+
+  void _toggleLock(MealIngredient mi) {
+    setState(() {
+      mi.locked = !mi.locked;
+      _recalcFillerWeights();
+    });
+  }
+
+  void _removeRow(MealIngredient mi) {
+    setState(() {
+      _mainRows.remove(mi);
+      _recalcFillerWeights();
+    });
+  }
+
+  // ─────────────────── UI build ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -93,13 +221,13 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
 
           return Column(
             children: [
-              // 1️⃣  MEAL-TYPE PICKER
+              // meal-type picker
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
                 child: DropdownButtonFormField<MealType>(
                   value: _selectedMealType,
                   decoration: const InputDecoration(
-                    labelText: 'Meal Type (macro targets)',
+                    labelText: 'Meal Type',
                     border: OutlineInputBorder(),
                   ),
                   items: mealTypes
@@ -108,14 +236,16 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                             child: Text(mt.name),
                           ))
                       .toList(),
-                  onChanged: (mt) => setState(() {
-                    _selectedMealType = mt;
-                    _mealIngredients.clear();
-                  }),
+                  onChanged: (mt) {
+                    setState(() {
+                      _selectedMealType = mt;
+                      _mainRows.clear();
+                      _fillerCarb = _fillerProtein = _fillerFat = null;
+                    });
+                  },
                 ),
               ),
-
-              // 2️⃣  REMAINING BAR (all rows)
+              // remaining bar
               if (_selectedMealType != null)
                 Container(
                   color: Theme.of(context).colorScheme.secondaryContainer,
@@ -124,42 +254,55 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
+                      _remainChip('C', _usedCarbsTotal,
+                          _selectedMealType!.carbs),
+                      _remainChip('P', _usedProteinTotal,
+                          _selectedMealType!.protein),
                       _remainChip(
-                        'C',
-                        _usedCarbsTotal,
-                        _selectedMealType!.carbs,
-                        _selectedMealType!.carbs - _usedCarbsTotal,
+                          'F', _usedFatTotal, _selectedMealType!.fat),
+                    ],
+                  ),
+                ),
+              // filler pickers
+              if (_selectedMealType != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: Column(
+                    children: [
+                      _fillerPicker(
+                        macro: 'C',
+                        label: 'Carb filler',
+                        current: _fillerCarb?.ingredient,
+                        choices: _singleMacro(ingredients, 'C'),
                       ),
-                      _remainChip(
-                        'P',
-                        _usedProteinTotal,
-                        _selectedMealType!.protein,
-                        _selectedMealType!.protein - _usedProteinTotal,
+                      _fillerPicker(
+                        macro: 'P',
+                        label: 'Protein filler',
+                        current: _fillerProtein?.ingredient,
+                        choices: _singleMacro(ingredients, 'P'),
                       ),
-                      _remainChip(
-                        'F',
-                        _usedFatTotal,
-                        _selectedMealType!.fat,
-                        _selectedMealType!.fat - _usedFatTotal,
+                      _fillerPicker(
+                        macro: 'F',
+                        label: 'Fat filler',
+                        current: _fillerFat?.ingredient,
+                        choices: _singleMacro(ingredients, 'F'),
                       ),
                     ],
                   ),
                 ),
-
-              // 3️⃣  AUTOCOMPLETE ADDER
+              // autocomplete adder
               if (_selectedMealType != null)
                 Padding(
                   padding: const EdgeInsets.all(8),
                   child: Autocomplete<Ingredient>(
-                    optionsBuilder: (val) {
-                      if (val.text.isEmpty) return const Iterable.empty();
-                      return ingredients.where((ing) => ing.name
-                          .toLowerCase()
-                          .contains(val.text.toLowerCase()));
-                    },
-                    displayStringForOption: (o) => o.name,
+                    optionsBuilder: (val) => val.text.isEmpty
+                        ? const Iterable<Ingredient>.empty()
+                        : ingredients.where((i) => i.name
+                            .toLowerCase()
+                            .contains(val.text.toLowerCase())),
+                    displayStringForOption: (i) => i.name,
                     fieldViewBuilder:
-                        (ctx, ctl, focus, onSubmit) => TextField(
+                        (ctx, ctl, focus, _) => TextField(
                       controller: ctl,
                       focusNode: focus,
                       decoration: const InputDecoration(
@@ -167,30 +310,53 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    onSelected: _addIngredient,
+                    onSelected: _addMainRow,
                   ),
                 ),
-
-              // 4️⃣  UNLOCKED LIST
+              // Filler list
+              if (_allFillers.isNotEmpty)
+                SizedBox(
+                  height: 110,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceVariant,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 4, horizontal: 12),
+                        child: const Text('Fillers (auto)'),
+                      ),
+                      Expanded(
+                        child: _buildList(
+                          _allFillers,
+                          remainingCarbs: 0,
+                          remainingProtein: 0,
+                          remainingFat: 0,
+                          editable: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // unlocked list
               Expanded(
-                child: _unlocked.isEmpty
+                child: _unlockedMain.isEmpty
                     ? const Center(child: Text('No ingredients yet.'))
                     : _buildList(
-                        context,
-                        _unlocked.toList(),
-                        remainingCarbs:
-                            _remainingAfterLocked(_selectedMealType!.carbs,
-                                _lockedCarbs),
-                        remainingProtein:
-                            _remainingAfterLocked(_selectedMealType!.protein,
-                                _lockedProtein),
-                        remainingFat: _remainingAfterLocked(
+                        _unlockedMain.toList(),
+                        remainingCarbs: _remainAfterLocked(
+                            _selectedMealType!.carbs, _lockedCarbs),
+                        remainingProtein: _remainAfterLocked(
+                            _selectedMealType!.protein, _lockedProtein),
+                        remainingFat: _remainAfterLocked(
                             _selectedMealType!.fat, _lockedFat),
+                        editable: true,
                       ),
               ),
-
-              // 5️⃣  LOCKED LIST
-              if (_locked.isNotEmpty)
+              // locked list
+              if (_lockedMain.isNotEmpty)
                 Column(
                   children: [
                     const Divider(height: 0),
@@ -199,16 +365,16 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                       color: Theme.of(context).colorScheme.surfaceVariant,
                       padding: const EdgeInsets.symmetric(
                           vertical: 4, horizontal: 12),
-                      child: const Text('Locked Ingredients'),
+                      child: const Text('Locked'),
                     ),
                     SizedBox(
-                      height: 160,
+                      height: 140,
                       child: _buildList(
-                        context,
-                        _locked.toList(),
+                        _lockedMain.toList(),
                         remainingCarbs: 0,
                         remainingProtein: 0,
                         remainingFat: 0,
+                        editable: false,
                       ),
                     ),
                   ],
@@ -220,39 +386,14 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     );
   }
 
-  Widget _buildList(
-    BuildContext context,
-    List<MealIngredient> list, {
-    required double remainingCarbs,
-    required double remainingProtein,
-    required double remainingFat,
-  }) {
-    return ListView.separated(
-      itemCount: list.length,
-      separatorBuilder: (_, __) => const Divider(height: 0),
-      itemBuilder: (ctx, idx) {
-        final mi = list[idx];
-        return _IngredientRow(
-          key: ValueKey(mi.ingredient.id),
-          mealIngredient: mi,
-          mealType: _selectedMealType!,
-          remainingCarbs: remainingCarbs,
-          remainingProtein: remainingProtein,
-          remainingFat: remainingFat,
-          onDelete: () => _removeIngredient(mi),
-          onChanged: _onRowUpdated,
-          onToggleLock: () => _toggleLock(mi),
-        );
-      },
-    );
-  }
-
-  Widget _remainChip(String label, double used, double tgt, double remain) {
+  // ─── small widgets helpers ────────────────────────────────────────────
+  Widget _remainChip(String lbl, double used, double tgt) {
+    final remain = tgt - used;
     final over = remain < 0;
     return Row(
       children: [
         Text(
-          '$label: ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)} '
+          '$lbl: ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)} '
           '(${remain.abs().toStringAsFixed(1)}${over ? ' over' : ' left'})',
           style: TextStyle(
             color: over
@@ -263,18 +404,67 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       ],
     );
   }
+
+  Widget _fillerPicker({
+    required String macro,
+    required String label,
+    required Ingredient? current,
+    required List<Ingredient> choices,
+  }) {
+    return DropdownButtonFormField<Ingredient>(
+      value: current,
+      decoration: InputDecoration(labelText: label, isDense: true),
+      items: [
+        const DropdownMenuItem<Ingredient>(
+          value: null,
+          child: Text('— None —'),
+        ),
+        ...choices.map((i) => DropdownMenuItem(value: i, child: Text(i.name)))
+      ],
+      onChanged: (ing) => _chooseFiller(macro, ing),
+    );
+  }
+
+  Widget _buildList(
+    List<MealIngredient> rows, {
+    required double remainingCarbs,
+    required double remainingProtein,
+    required double remainingFat,
+    required bool editable,
+  }) {
+    return ListView.separated(
+      itemCount: rows.length,
+      separatorBuilder: (_, __) => const Divider(height: 0),
+      itemBuilder: (ctx, idx) {
+        final mi = rows[idx];
+        return _IngredientRow(
+          key: ValueKey(mi),
+          mealIngredient: mi,
+          mealType: _selectedMealType!,
+          remainingCarbs: remainingCarbs,
+          remainingProtein: remainingProtein,
+          remainingFat: remainingFat,
+          editable: editable,
+          onChange: _onRowChanged,
+          onDelete: () => _removeRow(mi),
+          onLockToggle: () => _toggleLock(mi),
+        );
+      },
+    );
+  }
 }
 
-// ──────────────────────  Ingredient Row ────────────────────────────────
+// ───────────────────── Ingredient Row widget ────────────────────────────
 class _IngredientRow extends StatefulWidget {
   final MealIngredient mealIngredient;
   final MealType mealType;
-  final double remainingCarbs;   // after locked
-  final double remainingProtein; // after locked
-  final double remainingFat;     // after locked
+  final double remainingCarbs;
+  final double remainingProtein;
+  final double remainingFat;
+  final bool editable;
+  final VoidCallback onChange;
   final VoidCallback onDelete;
-  final VoidCallback onChanged;
-  final VoidCallback onToggleLock;
+  final VoidCallback onLockToggle;
 
   const _IngredientRow({
     required super.key,
@@ -283,9 +473,10 @@ class _IngredientRow extends StatefulWidget {
     required this.remainingCarbs,
     required this.remainingProtein,
     required this.remainingFat,
+    required this.editable,
+    required this.onChange,
     required this.onDelete,
-    required this.onChanged,
-    required this.onToggleLock,
+    required this.onLockToggle,
   });
 
   @override
@@ -293,7 +484,7 @@ class _IngredientRow extends StatefulWidget {
 }
 
 class _IngredientRowState extends State<_IngredientRow> {
-  late final TextEditingController _weightCtl;
+  late final TextEditingController _gCtl;
   late final TextEditingController _cPctCtl;
   late final TextEditingController _pPctCtl;
   late final TextEditingController _fPctCtl;
@@ -304,126 +495,100 @@ class _IngredientRowState extends State<_IngredientRow> {
   @override
   void initState() {
     super.initState();
-    _weightCtl = TextEditingController(text: mi.weight.toStringAsFixed(2));
-    _cPctCtl   = TextEditingController();
-    _pPctCtl   = TextEditingController();
-    _fPctCtl   = TextEditingController();
-    _refreshPctTexts();
+    _gCtl = TextEditingController(text: mi.weight.toStringAsFixed(1));
+    _cPctCtl = TextEditingController();
+    _pPctCtl = TextEditingController();
+    _fPctCtl = TextEditingController();
+    _refreshPct();
   }
 
   @override
-  void didUpdateWidget(covariant _IngredientRow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _refreshPctTexts(); // keep % fresh when remaining changes
+  void didUpdateWidget(covariant _IngredientRow old) {
+    super.didUpdateWidget(old);
+    _refreshPct();
   }
 
-  @override
-  void dispose() {
-    _weightCtl.dispose();
-    _cPctCtl.dispose();
-    _pPctCtl.dispose();
-    _fPctCtl.dispose();
-    super.dispose();
+  void _refreshPct() {
+    String pct(double part, double denom) =>
+        denom == 0 ? '0.0' : (part / denom * 100).toStringAsFixed(1);
+    _cPctCtl.text = pct(mi.carbs, widget.remainingCarbs);
+    _pPctCtl.text = pct(mi.protein, widget.remainingProtein);
+    _fPctCtl.text = pct(mi.fat, widget.remainingFat);
   }
 
-  // ── helpers ───────────────────────────────────────────────────────────
-  String _pctOf(double part, double denom) =>
-      denom == 0 ? '0.0' : (part / denom * 100).toStringAsFixed(1);
-
-  void _refreshPctTexts() {
-    _cPctCtl.text =
-        _pctOf(mi.carbs,   widget.remainingCarbs);
-    _pPctCtl.text =
-        _pctOf(mi.protein, widget.remainingProtein);
-    _fPctCtl.text =
-        _pctOf(mi.fat,     widget.remainingFat);
-  }
+  void _selectAll(TextEditingController c) =>
+      c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
 
   double _gPerG(double macro) => macro / ing.defaultWeight;
 
-  void _selectAll(TextEditingController ctl) =>
-      ctl.selection = TextSelection(baseOffset: 0, extentOffset: ctl.text.length);
-
-  // weight editing
-  void _applyNewWeight(String val) {
-    if (mi.locked) return;
-    final w = double.tryParse(val);
-    if (w == null || w <= 0) return;
-
-    setState(() {
-      mi.weight = w;
-      _weightCtl.text = w.toStringAsFixed(2);
-      _refreshPctTexts();
-    });
-    widget.onChanged();
+  void _setWeight(double w) {
+    mi.weight = w;
+    _gCtl.text = w.toStringAsFixed(1);
+    _refreshPct();
+    widget.onChange();
   }
 
-  // % editing (relative to remaining after locked)
-  void _applyNewPct(String macroKey, String val) {
-    if (mi.locked) return;
-    final pct = double.tryParse(val);
+  void _weightSubmit(String v) {
+    if (!widget.editable) return;
+    final d = double.tryParse(v);
+    if (d != null && d > 0) _setWeight(d);
+  }
+
+  void _pctSubmit(String macro, String v) {
+    if (!widget.editable) return;
+    final pct = double.tryParse(v);
     if (pct == null || pct < 0) return;
 
-    double newWeight = mi.weight;
-
-    switch (macroKey) {
+    double newW = mi.weight;
+    switch (macro) {
       case 'C':
         if (ing.carbs == 0 || widget.remainingCarbs == 0) return;
-        newWeight = (widget.remainingCarbs * pct / 100) / _gPerG(ing.carbs);
+        newW =
+            (widget.remainingCarbs * pct / 100) / _gPerG(ing.carbs);
         break;
       case 'P':
         if (ing.protein == 0 || widget.remainingProtein == 0) return;
-        newWeight =
+        newW =
             (widget.remainingProtein * pct / 100) / _gPerG(ing.protein);
         break;
       case 'F':
         if (ing.fat == 0 || widget.remainingFat == 0) return;
-        newWeight = (widget.remainingFat * pct / 100) / _gPerG(ing.fat);
+        newW =
+            (widget.remainingFat * pct / 100) / _gPerG(ing.fat);
         break;
     }
-
-    setState(() {
-      mi.weight = newWeight;
-      _weightCtl.text = newWeight.toStringAsFixed(2);
-      _refreshPctTexts();
-    });
-    widget.onChanged();
+    _setWeight(newW);
   }
 
-  // ── build ─────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: IconButton(
         icon: Icon(mi.locked ? Icons.lock : Icons.lock_open),
-        onPressed: widget.onToggleLock,
+        onPressed: widget.editable ? widget.onLockToggle : null,
       ),
       title: Text(ing.name),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // row 1: weight + calories
           Row(
             children: [
               const Text('g: '),
               SizedBox(
-                width: 80,
+                width: 70,
                 child: TextField(
-                  controller: _weightCtl,
-                  enabled: !mi.locked,
+                  controller: _gCtl,
+                  enabled: widget.editable,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  onSubmitted: _applyNewWeight,
-                  onEditingComplete: () =>
-                      _applyNewWeight(_weightCtl.text),
-                  onTap: () => _selectAll(_weightCtl),
+                  onSubmitted: _weightSubmit,
+                  onTap: () => _selectAll(_gCtl),
                 ),
               ),
               const SizedBox(width: 12),
               Text('Cal ${mi.calories.toStringAsFixed(1)}'),
             ],
           ),
-          // row 2: % fields
           Wrap(
             spacing: 12,
             children: [
@@ -434,26 +599,26 @@ class _IngredientRowState extends State<_IngredientRow> {
           ),
         ],
       ),
-      trailing: IconButton(
-        icon: const Icon(Icons.delete, color: Colors.red),
-        onPressed: widget.onDelete,
-      ),
+      trailing: widget.editable
+          ? IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: widget.onDelete,
+            )
+          : null,
     );
   }
 
-  Widget _pctField(
-      String label, TextEditingController ctl, bool disabled) {
+  Widget _pctField(String lbl, TextEditingController c, bool disabled) {
     return SizedBox(
-      width: 80,
+      width: 70,
       child: TextField(
-        controller: ctl,
-        enabled: !disabled && !mi.locked,
+        controller: c,
+        enabled: !disabled && widget.editable,
         keyboardType:
             const TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(labelText: '$label %', isDense: true),
-        onTap: () => _selectAll(ctl),
-        onSubmitted: (v) => _applyNewPct(label, v),
-        onEditingComplete: () => _applyNewPct(label, ctl.text),
+        decoration: InputDecoration(labelText: '$lbl %', isDense: true),
+        onTap: () => _selectAll(c),
+        onSubmitted: (v) => _pctSubmit(lbl, v),
       ),
     );
   }
