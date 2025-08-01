@@ -313,72 +313,99 @@ void _recalcFillerWeights() {
                     onSelected: _addMainRow,
                   ),
                 ),
-              // Filler list
-              if (_allFillers.isNotEmpty)
-                SizedBox(
-                  height: 110,
-                  child: Column(
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceVariant,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 4, horizontal: 12),
-                        child: const Text('Fillers (auto)'),
-                      ),
-                      Expanded(
-                        child: _buildList(
-                          _allFillers,
-                          remainingCarbs: 0,
-                          remainingProtein: 0,
-                          remainingFat: 0,
-                          editable: false,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              // unlocked list
-              Expanded(
-                child: _unlockedMain.isEmpty
-                    ? const Center(child: Text('No ingredients yet.'))
-                    : _buildList(
-                        _unlockedMain.toList(),
-                        remainingCarbs: _remainAfterLocked(
-                            _selectedMealType!.carbs, _lockedCarbs),
-                        remainingProtein: _remainAfterLocked(
-                            _selectedMealType!.protein, _lockedProtein),
-                        remainingFat: _remainAfterLocked(
-                            _selectedMealType!.fat, _lockedFat),
-                        editable: true,
-                      ),
-              ),
-              // locked list
-              if (_lockedMain.isNotEmpty)
-                Column(
-                  children: [
-                    const Divider(height: 0),
-                    Container(
-                      width: double.infinity,
-                      color: Theme.of(context).colorScheme.surfaceVariant,
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 4, horizontal: 12),
-                      child: const Text('Locked'),
-                    ),
-                    SizedBox(
-                      height: 140,
-                      child: _buildList(
-                        _lockedMain.toList(),
-                        remainingCarbs: 0,
-                        remainingProtein: 0,
-                        remainingFat: 0,
-                        editable: false,
-                      ),
-                    ),
-                  ],
-                ),
+              // ── ONE combined scrollable list (fillers → unlocked → locked) ──────────
+Expanded(
+  child: ListView(
+    children: [
+      // Fillers ----------------------------------------------------------
+      if (_allFillers.isNotEmpty) ...[
+        Container(
+          width: double.infinity,
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+          child: const Text('Fillers (auto)'),
+        ),
+        ..._allFillers.map(
+          (mi) => _IngredientRow(
+            key: ValueKey(mi),
+            mealIngredient: mi,
+            mealType: _selectedMealType!,
+            remainingCarbs: 0,
+            remainingProtein: 0,
+            remainingFat: 0,
+            editable: false,
+            onChange: _onRowChanged,
+            onDelete: () {},            // read-only
+            onLockToggle: () {},        // always locked
+          ),
+        ),
+        const Divider(height: 0),
+      ],
+
+      // Unlocked ---------------------------------------------------------
+      if (_unlockedMain.isNotEmpty) ...[
+        Container(
+          width: double.infinity,
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+          child: const Text('Unlocked'),
+        ),
+        ..._unlockedMain.map(
+          (mi) => _IngredientRow(
+            key: ValueKey(mi),
+            mealIngredient: mi,
+            mealType: _selectedMealType!,
+            remainingCarbs: _remainAfterLocked(
+                _selectedMealType!.carbs, _lockedCarbs),
+            remainingProtein: _remainAfterLocked(
+                _selectedMealType!.protein, _lockedProtein),
+            remainingFat:
+                _remainAfterLocked(_selectedMealType!.fat, _lockedFat),
+            editable: true,
+            onChange: _onRowChanged,
+            onDelete: () => _removeRow(mi),
+            onLockToggle: () => _toggleLock(mi),
+          ),
+        ),
+        const Divider(height: 0),
+      ],
+
+      // Locked -----------------------------------------------------------
+      if (_lockedMain.isNotEmpty) ...[
+        Container(
+          width: double.infinity,
+          color: Theme.of(context).colorScheme.surfaceVariant,
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+          child: const Text('Locked'),
+        ),
+        ..._lockedMain.map(
+          (mi) => _IngredientRow(
+            key: ValueKey(mi),
+            mealIngredient: mi,
+            mealType: _selectedMealType!,
+            remainingCarbs: 0,
+            remainingProtein: 0,
+            remainingFat: 0,
+            editable: false,
+            onChange: _onRowChanged,
+            onDelete: () {},        // locked rows not deletable here
+            onLockToggle: () => _toggleLock(mi),
+          ),
+        ),
+      ],
+
+      // Empty state ------------------------------------------------------
+      if (_allFillers.isEmpty &&
+          _unlockedMain.isEmpty &&
+          _lockedMain.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: Text('No ingredients yet.')),
+        ),
+    ],
+  ),
+),
+
             ],
           );
         },
