@@ -335,7 +335,7 @@ Expanded(
             remainingFat: 0,
             editable: false,
             onChange: _onRowChanged,
-            onDelete: () {},            // read-only
+            onDelete: null,            // read-only
             onLockToggle: () {},        // always locked
           ),
         ),
@@ -388,7 +388,7 @@ Expanded(
             remainingFat: 0,
             editable: false,
             onChange: _onRowChanged,
-            onDelete: () {},        // locked rows not deletable here
+            onDelete: () => _removeRow(mi),        // locked rows deletable 
             onLockToggle: () => _toggleLock(mi),
           ),
         ),
@@ -452,33 +452,7 @@ Expanded(
     );
   }
 
-  Widget _buildList(
-    List<MealIngredient> rows, {
-    required double remainingCarbs,
-    required double remainingProtein,
-    required double remainingFat,
-    required bool editable,
-  }) {
-    return ListView.separated(
-      itemCount: rows.length,
-      separatorBuilder: (_, __) => const Divider(height: 0),
-      itemBuilder: (ctx, idx) {
-        final mi = rows[idx];
-        return _IngredientRow(
-          key: ValueKey(mi),
-          mealIngredient: mi,
-          mealType: _selectedMealType!,
-          remainingCarbs: remainingCarbs,
-          remainingProtein: remainingProtein,
-          remainingFat: remainingFat,
-          editable: editable,
-          onChange: _onRowChanged,
-          onDelete: () => _removeRow(mi),
-          onLockToggle: () => _toggleLock(mi),
-        );
-      },
-    );
-  }
+
 }
 
 // ───────────────────── Ingredient Row widget ────────────────────────────
@@ -490,7 +464,7 @@ class _IngredientRow extends StatefulWidget {
   final double remainingFat;
   final bool editable;
   final VoidCallback onChange;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final VoidCallback onLockToggle;
 
   const _IngredientRow({
@@ -592,7 +566,7 @@ class _IngredientRowState extends State<_IngredientRow> {
     return ListTile(
       leading: IconButton(
         icon: Icon(mi.locked ? Icons.lock : Icons.lock_open),
-        onPressed: widget.editable ? widget.onLockToggle : null,
+        onPressed: widget.onLockToggle,
       ),
       title: Text(ing.name),
       subtitle: Column(
@@ -626,7 +600,7 @@ class _IngredientRowState extends State<_IngredientRow> {
           ),
         ],
       ),
-      trailing: widget.editable
+      trailing: widget.onDelete != null
           ? IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: widget.onDelete,
