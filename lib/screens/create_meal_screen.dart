@@ -22,6 +22,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   final _mealTypeService   = MealTypeService();
   late Future<List<Ingredient>> _allIngredientsFuture;
   late Future<List<MealType>>   _allMealTypesFuture;
+  late final ScrollController _listController; // NEW
 
   // ─────────────────── state ────────────────────────────────────────────
   MealType? _selectedMealType;
@@ -34,10 +35,16 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   @override
   void initState() {
     super.initState();
+    _listController = ScrollController();
     _allIngredientsFuture = _ingredientService.loadIngredients();
     _allMealTypesFuture   = _mealTypeService.loadMealTypes();
   }
-
+  @override
+  void dispose() {
+    _listController.dispose();   // dispose the ScrollController
+    super.dispose();             // always call super.dispose()
+  }
+  
   // ─────────────────── helpers: lists & totals ─────────────────────────
   Iterable<MealIngredient> get _lockedMain =>
       _mainRows.where((mi) => mi.locked);
@@ -316,6 +323,8 @@ void _recalcFillerWeights() {
               // ── ONE combined scrollable list (fillers → unlocked → locked) ──────────
 Expanded(
   child: ListView(
+    key: const PageStorageKey('meal-scroll'), // KEEP scroll offset
+    controller: _listController,
     children: [
       // Fillers ----------------------------------------------------------
       if (_allFillers.isNotEmpty) ...[
@@ -393,6 +402,8 @@ Expanded(
           ),
         ),
       ],
+      // Summary ---------------------------------------------------------
+      ..._summarySection(),
 
       // Empty state ------------------------------------------------------
       if (_allFillers.isEmpty &&
@@ -451,6 +462,41 @@ Expanded(
       onChanged: (ing) => _chooseFiller(macro, ing),
     );
   }
+  // ── Meal summary section ─────────────────────────────────────────────
+  List<Widget> _summarySection() {
+    final rowsInOrder = [
+      ..._allFillers,
+      ..._unlockedMain,
+      ..._lockedMain,
+    ];
+
+    if (rowsInOrder.isEmpty) return [];
+
+    return [
+      const Divider(height: 0),
+      Container(
+        width: double.infinity,
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        padding:
+            const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        child: const Text('Meal Summary (g)'),
+      ),
+      ...rowsInOrder.map(
+        (mi) => Padding(
+          padding:
+              const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(mi.ingredient.name),
+              Text('${mi.weight.toStringAsFixed(1)} g'),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+    ];
+  }
 
 
 }
@@ -502,8 +548,7 @@ class _IngredientRowState extends State<_IngredientRow> {
     _fPctCtl = TextEditingController();
     _refreshPct();
   }
-
-  @override
+@override
   void didUpdateWidget(covariant _IngredientRow old) {
     super.didUpdateWidget(old);
     _refreshPct();
