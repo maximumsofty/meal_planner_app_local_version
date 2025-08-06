@@ -35,6 +35,13 @@ class MealType {
       fat: fat ?? this.fat,
     );
   }
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MealType && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 
   /// Convert a MealType into a Map for JSON storage.
   Map<String, dynamic> toJson() {
