@@ -29,6 +29,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   late Future<List<Ingredient>> _allIngredientsFuture;
   late Future<List<MealType>>   _allMealTypesFuture;
   late final ScrollController _listController; // NEW
+  static const _lastFillerKeyC = 'last_filler_carb';     // ✅ now legal
+  static const _lastFillerKeyP = 'last_filler_protein';
+  static const _lastFillerKeyF = 'last_filler_fat';
 
   // ─────────────────── state ────────────────────────────────────────────
   MealType? _selectedMealType;
@@ -45,6 +48,28 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     _allIngredientsFuture = _ingredientService.loadIngredients();
     _allMealTypesFuture   = _mealTypeService.loadMealTypes();
     _allIngredientsFuture.then((ings) => _loadDraft(ings));
+        // If no draft loaded and user starts fresh, pre-select last fillers
+    _allIngredientsFuture.then((ings) async {
+      final prefs = await SharedPreferences.getInstance();
+      Map<String, String?> ids = {
+        'C': prefs.getString(_lastFillerKeyC),
+        'P': prefs.getString(_lastFillerKeyP),
+        'F': prefs.getString(_lastFillerKeyF),
+      };
+            Ingredient? _getIng(String? id) {
+        if (id == null) return null;
+        for (final i in ings) {
+          if (i.id == id) return i;
+        }
+        return null; // no match
+      }
+
+      _chooseFiller('C', _getIng(prefs.getString(_lastFillerKeyC)));
+      _chooseFiller('P', _getIng(prefs.getString(_lastFillerKeyP)));
+      _chooseFiller('F', _getIng(prefs.getString(_lastFillerKeyF)));
+
+    });
+
   }
   @override
   void dispose() {
@@ -103,6 +128,20 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     return all.where(ok).toList();
   }
 
+  Future<void> _saveLastFiller(String macro, Ingredient? ing) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = {
+      'C': _lastFillerKeyC,
+      'P': _lastFillerKeyP,
+      'F': _lastFillerKeyF,
+    }[macro]!;
+    if (ing == null) {
+      prefs.remove(key);
+    } else {
+      prefs.setString(key, ing.id);
+    }
+  }
+
   void _chooseFiller(String macro, Ingredient? ing) {
     // remove old filler weight from totals
     void _removeOld(MealIngredient? mi) {
@@ -133,6 +172,8 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       _recalcFillerWeights();
     });
   _saveDraft();            // NEW
+  _saveLastFiller(macro, ing);          // NEW – remember choice
+
 }
   // ── Save-meal dialog ──────────────────────────────────────────────────
   Future<void> _showSaveDialog() async {
@@ -222,7 +263,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
             'ingredient': mi.ingredient.toJson(),
             'weight': mi.weight,
             'locked': mi.locked,
-          }),
+          }).toList(),
       'fillerC': _fillerCarb?.ingredient.toJson(),
       'fillerP': _fillerProtein?.ingredient.toJson(),
       'fillerF': _fillerFat?.ingredient.toJson(),
