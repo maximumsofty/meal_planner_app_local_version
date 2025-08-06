@@ -129,11 +129,11 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
         case 'F':
           _fillerFat = newMI;
           break;
-    _saveDraft();            // NEW
-      }
+          }
       _recalcFillerWeights();
     });
-  }
+  _saveDraft();            // NEW
+}
   // ── Save-meal dialog ──────────────────────────────────────────────────
   Future<void> _showSaveDialog() async {
     final nameCtl = TextEditingController(
@@ -230,48 +230,55 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
 
     await prefs.setString(_draftKey, jsonEncode(draft));
   }
+  // ── Draft restoration (awaits loadMealTypes) ──────────────────────────
   Future<void> _loadDraft(List<Ingredient> allIngredients) async {
     final prefs = await SharedPreferences.getInstance();
     final str = prefs.getString(_draftKey);
     if (str == null) return;
 
     final draft = jsonDecode(str);
-    final mtId = draft['mealTypeId'];
-    if (mtId != null) {
-      _selectedMealType =
-          (await _mealTypeService.loadMealTypes()).firstWhere(
-        (mt) => mt.id == mtId,
-        orElse: () => _selectedMealType!,
-      );
-    }
 
-    List<Ingredient> _toIng(Map<String, dynamic>? j) {
-      if (j == null) return [];
-      return allIngredients.where((i) => i.id == j['id']).toList();
-    }
+    // Fetch meal types so we can match the saved ID
+    final mealTypes = await _mealTypeService.loadMealTypes();
 
-    _mainRows.clear();
-    for (final row in draft['mainRows'] ?? []) {
-      final ingJson = row['ingredient'] as Map<String, dynamic>;
-      final ing = allIngredients.firstWhere(
+    setState(() {
+      // MealType
+      final mtId = draft['mealTypeId'];
+      if (mtId != null) {
+        _selectedMealType =
+            mealTypes.firstWhere((mt) => mt.id == mtId, orElse: () => _selectedMealType!);
+      }
+
+      // Main rows
+      _mainRows.clear();
+      for (final row in draft['mainRows'] ?? []) {
+        final ingJson = row['ingredient'] as Map<String, dynamic>;
+        final ing = allIngredients.firstWhere(
           (i) => i.id == ingJson['id'],
-          orElse: () => Ingredient.fromJson(ingJson));
-      _mainRows.add(MealIngredient(
-        ingredient: ing,
-        weight: (row['weight'] as num).toDouble(),
-      )..locked = row['locked'] as bool);
-    }
+          orElse: () => Ingredient.fromJson(ingJson),
+        );
+        _mainRows.add(
+          MealIngredient(ingredient: ing, weight: (row['weight'] as num).toDouble())
+            ..locked = row['locked'] as bool,
+        );
+      }
 
-    Ingredient? _find(Map<String, dynamic>? j) =>
-        j == null ? null : allIngredients.firstWhere(
-          (i) => i.id == j['id'],
-          orElse: () => Ingredient.fromJson(j));
-    _chooseFiller('C', _find(draft['fillerC']));
-    _chooseFiller('P', _find(draft['fillerP']));
-    _chooseFiller('F', _find(draft['fillerF']));
+      // Fillers
+      Ingredient? _getIng(Map<String, dynamic>? j) =>
+          j == null ? null : allIngredients.firstWhere(
+                (i) => i.id == j['id'],
+                orElse: () => Ingredient.fromJson(j),
+              );
 
-    _recalcFillerWeights();
+      _chooseFiller('C', _getIng(draft['fillerC']));
+      _chooseFiller('P', _getIng(draft['fillerP']));
+      _chooseFiller('F', _getIng(draft['fillerF']));
+
+      _recalcFillerWeights();
+    });
   }
+
+
 void _recalcFillerWeights() {
   if (_selectedMealType == null) return;
 
