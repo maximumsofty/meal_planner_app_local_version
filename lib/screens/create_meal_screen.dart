@@ -8,6 +8,8 @@ import '../models/meal_ingredient.dart';
 import '../models/meal_type.dart';
 import '../services/ingredient_service.dart';
 import '../services/meal_type_service.dart';
+import '../services/meal_service.dart';   // NEW
+import '../models/meal.dart';             // NEW
 
 class CreateMealScreen extends StatefulWidget {
   const CreateMealScreen({super.key});
@@ -20,6 +22,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   // ─────────────────── services & initial loads ────────────────────────
   final _ingredientService = IngredientService();
   final _mealTypeService   = MealTypeService();
+  final _mealService = MealService();     // NEW
   late Future<List<Ingredient>> _allIngredientsFuture;
   late Future<List<MealType>>   _allMealTypesFuture;
   late final ScrollController _listController; // NEW
@@ -126,6 +129,79 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       _recalcFillerWeights();
     });
   }
+  // ── Save-meal dialog ──────────────────────────────────────────────────
+  Future<void> _showSaveDialog() async {
+    final nameCtl = TextEditingController(
+      text: 'Meal ${DateTime.now().toIso8601String().substring(0, 16)}',
+    );
+    bool fav = false;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save Meal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtl,
+              decoration: const InputDecoration(labelText: 'Meal name'),
+            ),
+            Row(
+              children: [
+                Checkbox(
+                  value: fav,
+                  onChanged: (v) {
+                    fav = v ?? false;
+                    (ctx as Element).markNeedsBuild();
+                  },
+                ),
+                const Text('Favorite'),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    // build rows list in visible order: fillers -> unlocked -> locked
+    final rows = [
+      ..._allFillers,
+      ..._unlockedMain,
+      ..._lockedMain,
+    ].map((mi) => MealIngredient(
+          ingredient: mi.ingredient,
+          weight: mi.weight,
+        )..locked = mi.locked).toList();
+
+    final meal = Meal(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: nameCtl.text.trim(),
+      favorite: fav,
+      createdAt: DateTime.now(),
+      mealTypeId: _selectedMealType!.id,
+      rows: rows,
+    );
+
+    await _mealService.addMeal(meal);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Meal saved')),
+    );
+  }
 
    // ───────────────── recalc filler weights (fixed types) ─────────────────
 void _recalcFillerWeights() {
@@ -212,7 +288,19 @@ void _recalcFillerWeights() {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Meal Builder')),
+      appBar: AppBar(
+        title: const Text('Meal Builder'),
+        actions: [
+          if (_selectedMealType != null &&
+              (_mainRows.isNotEmpty || _allFillers.isNotEmpty))
+            IconButton(
+              tooltip: 'Save meal',
+              icon: const Icon(Icons.save),
+              onPressed: _showSaveDialog,   // NEW
+            ),
+        ],
+      ),
+
       body: FutureBuilder(
         future: Future.wait([_allIngredientsFuture, _allMealTypesFuture]),
         builder: (ctx, snap) {
