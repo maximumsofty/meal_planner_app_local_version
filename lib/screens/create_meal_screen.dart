@@ -10,6 +10,8 @@ import '../services/ingredient_service.dart';
 import '../services/meal_type_service.dart';
 import '../services/meal_service.dart';   // NEW
 import '../models/meal.dart';             // NEW
+import 'dart:convert';                      // for jsonEncode/jsonDecode
+import 'package:shared_preferences/shared_preferences.dart';
 
 class CreateMealScreen extends StatefulWidget {
   const CreateMealScreen({super.key});
@@ -23,6 +25,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   final _ingredientService = IngredientService();
   final _mealTypeService   = MealTypeService();
   final _mealService = MealService();     // NEW
+  static const _draftKey = 'meal_builder_draft';                   // NEW
   late Future<List<Ingredient>> _allIngredientsFuture;
   late Future<List<MealType>>   _allMealTypesFuture;
   late final ScrollController _listController; // NEW
@@ -41,6 +44,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     _listController = ScrollController();
     _allIngredientsFuture = _ingredientService.loadIngredients();
     _allMealTypesFuture   = _mealTypeService.loadMealTypes();
+    _allIngredientsFuture.then((ings) => _loadDraft(ings));
   }
   @override
   void dispose() {
@@ -125,6 +129,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
         case 'F':
           _fillerFat = newMI;
           break;
+    _saveDraft();            // NEW
       }
       _recalcFillerWeights();
     });
@@ -196,6 +201,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     );
 
     await _mealService.addMeal(meal);
+    // clear draft
+    final prefs = await SharedPreferences.getInstance();
+    prefs.remove(_draftKey);
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -204,6 +212,66 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   }
 
    // ───────────────── recalc filler weights (fixed types) ─────────────────
+  // ── Draft persistence ────────────────────────────────────────────────
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final draft = {
+      'mealTypeId': _selectedMealType?.id,
+      'mainRows': _mainRows.map((mi) => {
+            'ingredient': mi.ingredient.toJson(),
+            'weight': mi.weight,
+            'locked': mi.locked,
+          }),
+      'fillerC': _fillerCarb?.ingredient.toJson(),
+      'fillerP': _fillerProtein?.ingredient.toJson(),
+      'fillerF': _fillerFat?.ingredient.toJson(),
+    };
+
+    await prefs.setString(_draftKey, jsonEncode(draft));
+  }
+  Future<void> _loadDraft(List<Ingredient> allIngredients) async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = prefs.getString(_draftKey);
+    if (str == null) return;
+
+    final draft = jsonDecode(str);
+    final mtId = draft['mealTypeId'];
+    if (mtId != null) {
+      _selectedMealType =
+          (await _mealTypeService.loadMealTypes()).firstWhere(
+        (mt) => mt.id == mtId,
+        orElse: () => _selectedMealType!,
+      );
+    }
+
+    List<Ingredient> _toIng(Map<String, dynamic>? j) {
+      if (j == null) return [];
+      return allIngredients.where((i) => i.id == j['id']).toList();
+    }
+
+    _mainRows.clear();
+    for (final row in draft['mainRows'] ?? []) {
+      final ingJson = row['ingredient'] as Map<String, dynamic>;
+      final ing = allIngredients.firstWhere(
+          (i) => i.id == ingJson['id'],
+          orElse: () => Ingredient.fromJson(ingJson));
+      _mainRows.add(MealIngredient(
+        ingredient: ing,
+        weight: (row['weight'] as num).toDouble(),
+      )..locked = row['locked'] as bool);
+    }
+
+    Ingredient? _find(Map<String, dynamic>? j) =>
+        j == null ? null : allIngredients.firstWhere(
+          (i) => i.id == j['id'],
+          orElse: () => Ingredient.fromJson(j));
+    _chooseFiller('C', _find(draft['fillerC']));
+    _chooseFiller('P', _find(draft['fillerP']));
+    _chooseFiller('F', _find(draft['fillerF']));
+
+    _recalcFillerWeights();
+  }
 void _recalcFillerWeights() {
   if (_selectedMealType == null) return;
 
@@ -260,6 +328,7 @@ void _recalcFillerWeights() {
   void _onRowChanged() {
     _recalcFillerWeights();
     setState(() {});
+    _saveDraft();            // NEW
   }
 
   void _addMainRow(Ingredient ing) {
@@ -268,6 +337,7 @@ void _recalcFillerWeights() {
           .add(MealIngredient(ingredient: ing, weight: ing.defaultWeight));
       _recalcFillerWeights();
     });
+    _saveDraft();            // NEW
   }
 
   void _toggleLock(MealIngredient mi) {
@@ -275,6 +345,7 @@ void _recalcFillerWeights() {
       mi.locked = !mi.locked;
       _recalcFillerWeights();
     });
+    _saveDraft();            // NEW
   }
 
   void _removeRow(MealIngredient mi) {
@@ -282,6 +353,7 @@ void _recalcFillerWeights() {
       _mainRows.remove(mi);
       _recalcFillerWeights();
     });
+    _saveDraft();            // NEW
   }
 
   // ─────────────────── UI build ─────────────────────────────────────────
