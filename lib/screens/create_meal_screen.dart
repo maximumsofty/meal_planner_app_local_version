@@ -453,10 +453,9 @@ void _recalcFillerWeights() {
                       .toList(),
                   onChanged: (mt) {
                     setState(() {
-                      _selectedMealType = mt;
-                      _mainRows.clear();
-                      _fillerCarb = _fillerProtein = _fillerFat = null;
-                    });
+                      _selectedMealType = mt;        // just switch targets
+                     });
+                   _recalcFillerWeights();          // adjust filler grams & % fields
                   },
                 ),
               ),
