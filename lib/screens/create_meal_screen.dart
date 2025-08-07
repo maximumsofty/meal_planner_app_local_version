@@ -535,7 +535,7 @@ Expanded(
     controller: _listController,
     children: [
       // Fillers ----------------------------------------------------------
-      if (_allFillers.isNotEmpty) ...[
+      if (_selectedMealType != null && _allFillers.isNotEmpty) ...[
         Container(
           width: double.infinity,
           color: Theme.of(context).colorScheme.surfaceVariant,
@@ -560,7 +560,7 @@ Expanded(
       ],
 
       // Unlocked ---------------------------------------------------------
-      if (_unlockedMain.isNotEmpty) ...[
+      if (_selectedMealType != null && _unlockedMain.isNotEmpty) ...[
         Container(
           width: double.infinity,
           color: Theme.of(context).colorScheme.surfaceVariant,
@@ -588,7 +588,7 @@ Expanded(
       ],
 
       // Locked -----------------------------------------------------------
-      if (_lockedMain.isNotEmpty) ...[
+      if (_selectedMealType != null && _lockedMain.isNotEmpty) ...[
         Container(
           width: double.infinity,
           color: Theme.of(context).colorScheme.surfaceVariant,
