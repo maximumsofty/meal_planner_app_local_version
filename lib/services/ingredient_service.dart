@@ -61,8 +61,8 @@ class IngredientService {
 
   /// TEMP/utility: remove the storage key entirely.
   /// Next call to [loadIngredients] will re-seed defaults.
-  Future<void> clearAllIngredientsStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
-  }
+ /// Future<void> clearAllIngredientsStorage() async {
+ ///   final prefs = await SharedPreferences.getInstance();
+ ///   await prefs.remove(_storageKey);
+ /// }
 }
