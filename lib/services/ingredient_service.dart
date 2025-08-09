@@ -10,39 +10,28 @@ class IngredientService {
   static const _storageKey = 'ingredients';
 
   /// Loads the list of saved Ingredients.
-  /// Seeds with [defaultIngredients] if nothing saved **or** the saved list is empty.
+  /// If none exist, seeds from [defaultIngredients] and returns them.
   Future<List<Ingredient>> loadIngredients() async {
     final prefs = await SharedPreferences.getInstance();
     final jsonString = prefs.getString(_storageKey);
 
-    // Nothing stored yet ➜ seed defaults
-    if (jsonString == null || jsonString.isEmpty) {
+    if (jsonString == null) {
+      // First run (or storage cleared): seed defaults
       await saveIngredients(defaultIngredients);
-      // Return a copy so callers can modify without touching the constant source
-      return List<Ingredient>.from(defaultIngredients);
+      return defaultIngredients;
     }
 
-    try {
-      final decoded = jsonDecode(jsonString) as List<dynamic>;
-      if (decoded.isEmpty) {
-        // Stored list is empty ➜ reseed
-        await saveIngredients(defaultIngredients);
-        return List<Ingredient>.from(defaultIngredients);
-      }
-      return decoded
-          .map((e) => Ingredient.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      // Corrupt JSON ➜ reseed
-      await saveIngredients(defaultIngredients);
-      return List<Ingredient>.from(defaultIngredients);
-    }
+    final List<dynamic> decoded = jsonDecode(jsonString) as List<dynamic>;
+    return decoded
+        .map((e) => Ingredient.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Saves the given list of Ingredients.
   Future<void> saveIngredients(List<Ingredient> ingredients) async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonString = jsonEncode(ingredients.map((i) => i.toJson()).toList());
+    final jsonList = ingredients.map((i) => i.toJson()).toList();
+    final jsonString = jsonEncode(jsonList);
     await prefs.setString(_storageKey, jsonString);
   }
 
@@ -65,7 +54,15 @@ class IngredientService {
     await saveIngredients(list);
   }
 
-  /// Convenience helper if you ever want to wipe user data and
-  /// restore the factory defaults (e.g. for a “Reset” button).
-  Future<void> resetToDefaults() async => saveIngredients(defaultIngredients);
+  /// Overwrite saved ingredients with the built-in defaults.
+  Future<void> resetToDefaults() async {
+    await saveIngredients(defaultIngredients);
+  }
+
+  /// TEMP/utility: remove the storage key entirely.
+  /// Next call to [loadIngredients] will re-seed defaults.
+  Future<void> clearAllIngredientsStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_storageKey);
+  }
 }
