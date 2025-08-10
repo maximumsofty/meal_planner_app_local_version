@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_theme.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/meal_types_screen.dart';
 import 'screens/ingredients_screen.dart';
@@ -6,20 +7,21 @@ import 'screens/create_meal_screen.dart';
 import 'screens/saved_meals_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const MealPlannerApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MealPlannerApp extends StatelessWidget {
+  const MealPlannerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Meal Planner App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const MainPage(),
+      title: 'Meal Planner',
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
+      home: const WelcomeScreen(),
     );
   }
 }

@@ -51,11 +51,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
         // If no draft loaded and user starts fresh, pre-select last fillers
     _allIngredientsFuture.then((ings) async {
       final prefs = await SharedPreferences.getInstance();
-      Map<String, String?> ids = {
-        'C': prefs.getString(_lastFillerKeyC),
-        'P': prefs.getString(_lastFillerKeyP),
-        'F': prefs.getString(_lastFillerKeyF),
-      };
+
             Ingredient? _getIng(String? id) {
         if (id == null) return null;
         for (final i in ings) {
@@ -175,6 +171,45 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   _saveLastFiller(macro, ing);          // NEW – remember choice
 
 }
+  // ── Reset builder ─────────────────────────────────────────────────────
+  Future<void> _resetBuilder() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset meal builder?'),
+        content: const Text(
+          'This will remove all unlocked and locked ingredients and clear the meal type. '
+          'Filler selections will be kept.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    setState(() {
+      _mainRows.clear();
+      _selectedMealType = null; // force user to choose meal type again
+    });
+
+    _recalcFillerWeights(); // safe; returns early when meal type is null
+    await _saveDraft();     // persist the cleared state (fillers remain)
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Builder reset')),
+    );
+  }
+
   // ── Save-meal dialog ──────────────────────────────────────────────────
   Future<void> _showSaveDialog() async {
     final nameCtl = TextEditingController(
@@ -411,12 +446,17 @@ void _recalcFillerWeights() {
       appBar: AppBar(
         title: const Text('Meal Builder'),
         actions: [
+          IconButton(
+            tooltip: 'Reset builder',
+            icon: const Icon(Icons.refresh),
+            onPressed: _resetBuilder,
+          ),
           if (_selectedMealType != null &&
               (_mainRows.isNotEmpty || _allFillers.isNotEmpty))
             IconButton(
               tooltip: 'Save meal',
               icon: const Icon(Icons.save),
-              onPressed: _showSaveDialog,   // NEW
+              onPressed: _showSaveDialog,
             ),
         ],
       ),
@@ -436,74 +476,78 @@ void _recalcFillerWeights() {
 
           return Column(
             children: [
-              // meal-type picker
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                child: DropdownButtonFormField<MealType>(
-                  value: _selectedMealType,
-                  decoration: const InputDecoration(
-                    labelText: 'Meal Type',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: mealTypes
-                      .map((mt) => DropdownMenuItem(
-                            value: mt,
-                            child: Text(mt.name),
-                          ))
-                      .toList(),
-                  onChanged: (mt) {
-                    setState(() {
-                      _selectedMealType = mt;        // just switch targets
-                     });
-                   _recalcFillerWeights();          // adjust filler grams & % fields
-                  },
-                ),
-              ),
-              // remaining bar
-              if (_selectedMealType != null)
-                Container(
-                  color: Theme.of(context).colorScheme.secondaryContainer,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _remainChip('C', _usedCarbsTotal,
-                          _selectedMealType!.carbs),
-                      _remainChip('P', _usedProteinTotal,
-                          _selectedMealType!.protein),
-                      _remainChip(
-                          'F', _usedFatTotal, _selectedMealType!.fat),
-                    ],
-                  ),
-                ),
-              // filler pickers
-              if (_selectedMealType != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: Column(
-                    children: [
-                      _fillerPicker(
-                        macro: 'C',
-                        label: 'Carb filler',
-                        current: _fillerCarb?.ingredient,
-                        choices: _singleMacro(ingredients, 'C'),
-                      ),
-                      _fillerPicker(
-                        macro: 'P',
-                        label: 'Protein filler',
-                        current: _fillerProtein?.ingredient,
-                        choices: _singleMacro(ingredients, 'P'),
-                      ),
-                      _fillerPicker(
-                        macro: 'F',
-                        label: 'Fat filler',
-                        current: _fillerFat?.ingredient,
-                        choices: _singleMacro(ingredients, 'F'),
-                      ),
-                    ],
-                  ),
-                ),
+            // Header card: Meal Type + Remaining + Fillers
+Padding(
+  padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+  child: Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Meal Type
+          DropdownButtonFormField<MealType>(
+            value: _selectedMealType,
+            decoration: const InputDecoration(
+              labelText: 'Meal Type',
+            ),
+            items: mealTypes
+                .map((mt) => DropdownMenuItem(
+                      value: mt,
+                      child: Text(mt.name),
+                    ))
+                .toList(),
+            onChanged: (mt) {
+              setState(() {
+                _selectedMealType = mt; // just switch targets
+              });
+              _recalcFillerWeights();
+            },
+          ),
+
+          // Remaining chips
+          if (_selectedMealType != null) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _remainChip('C', _usedCarbsTotal, _selectedMealType!.carbs),
+                _remainChip('P', _usedProteinTotal, _selectedMealType!.protein),
+                _remainChip('F', _usedFatTotal, _selectedMealType!.fat),
+              ],
+            ),
+          ],
+
+          // Fillers
+          if (_selectedMealType != null) ...[
+            const SizedBox(height: 12),
+            _fillerPicker(
+              macro: 'C',
+              label: 'Carb filler',
+              current: _fillerCarb?.ingredient,
+              choices: _singleMacro(ingredients, 'C'),
+            ),
+            const SizedBox(height: 8),
+            _fillerPicker(
+              macro: 'P',
+              label: 'Protein filler',
+              current: _fillerProtein?.ingredient,
+              choices: _singleMacro(ingredients, 'P'),
+            ),
+            const SizedBox(height: 8),
+            _fillerPicker(
+              macro: 'F',
+              label: 'Fat filler',
+              current: _fillerFat?.ingredient,
+              choices: _singleMacro(ingredients, 'F'),
+            ),
+          ],
+        ],
+      ),
+    ),
+  ),
+),
               // autocomplete adder
               if (_selectedMealType != null)
                 Padding(
@@ -537,7 +581,7 @@ Expanded(
       if (_selectedMealType != null && _allFillers.isNotEmpty) ...[
         Container(
           width: double.infinity,
-          color: Theme.of(context).colorScheme.surfaceVariant,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
           child: const Text('Fillers (auto)'),
         ),
@@ -562,7 +606,7 @@ Expanded(
       if (_selectedMealType != null && _unlockedMain.isNotEmpty) ...[
         Container(
           width: double.infinity,
-          color: Theme.of(context).colorScheme.surfaceVariant,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
           child: const Text('Unlocked'),
         ),
@@ -590,7 +634,7 @@ Expanded(
       if (_selectedMealType != null && _lockedMain.isNotEmpty) ...[
         Container(
           width: double.infinity,
-          color: Theme.of(context).colorScheme.surfaceVariant,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
           child: const Text('Locked'),
         ),
@@ -633,22 +677,26 @@ Expanded(
 
   // ─── small widgets helpers ────────────────────────────────────────────
   Widget _remainChip(String lbl, double used, double tgt) {
-    final remain = tgt - used;
-    final over = remain < 0;
-    return Row(
-      children: [
-        Text(
-          '$lbl: ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)} '
-          '(${remain.abs().toStringAsFixed(1)}${over ? ' over' : ' left'})',
-          style: TextStyle(
-            color: over
-                ? Theme.of(context).colorScheme.error
-                : Theme.of(context).textTheme.bodyMedium!.color,
-          ),
-        ),
-      ],
-    );
-  }
+  final remain = tgt - used;
+  final over = remain < 0;
+  final scheme = Theme.of(context).colorScheme;
+
+  // Tonal backgrounds for quick scanning
+  final bg = over ? scheme.errorContainer : scheme.secondaryContainer;
+  final fg = over ? scheme.onErrorContainer : scheme.onSecondaryContainer;
+
+  final text =
+      '$lbl  ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)}  '
+      '(${remain.abs().toStringAsFixed(1)} ${over ? 'over' : 'left'})';
+
+  return Chip(
+    label: Text(text),
+    backgroundColor: bg,
+    labelStyle: TextStyle(color: fg),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  );
+}
 
   Widget _fillerPicker({
     required String macro,
@@ -683,7 +731,7 @@ Expanded(
       const Divider(height: 0),
       Container(
         width: double.infinity,
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         padding:
             const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
         child: const Text('Meal Summary (g)'),
