@@ -78,6 +78,7 @@ class _MealTypeFormScreenState extends State<MealTypeFormScreen> {
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _carbsController,
                 decoration: const InputDecoration(labelText: 'Carbs (g)'),
@@ -86,6 +87,7 @@ class _MealTypeFormScreenState extends State<MealTypeFormScreen> {
                 validator: (v) =>
                     (v == null || double.tryParse(v) == null) ? 'Invalid' : null,
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _proteinController,
                 decoration: const InputDecoration(labelText: 'Protein (g)'),
@@ -94,6 +96,7 @@ class _MealTypeFormScreenState extends State<MealTypeFormScreen> {
                 validator: (v) =>
                     (v == null || double.tryParse(v) == null) ? 'Invalid' : null,
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _fatController,
                 decoration: const InputDecoration(labelText: 'Fat (g)'),
