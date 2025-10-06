@@ -41,6 +41,12 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
   }
 
   @override
+  void dispose() {
+    _searchCtl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Saved Meals')),

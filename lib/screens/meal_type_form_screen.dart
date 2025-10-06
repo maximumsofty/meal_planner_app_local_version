@@ -55,6 +55,7 @@ class _MealTypeFormScreenState extends State<MealTypeFormScreen> {
     );
 
     await _service.upsertMealType(newMealType);
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 

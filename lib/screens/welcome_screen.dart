@@ -13,7 +13,7 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // helper to avoid repeating boilerplate
-    ElevatedButton _navButton(String label, Widget screen) =>
+    ElevatedButton navButton(String label, Widget screen) =>
         ElevatedButton.icon(
           icon: const Icon(Icons.arrow_forward),
           label: Text(label),
@@ -38,10 +38,10 @@ class WelcomeScreen extends StatelessWidget {
               style: TextStyle(fontSize: 18),
             ),
             const SizedBox(height: 24),
-            _navButton('Create Meal', const CreateMealScreen()),
-            _navButton('Saved Meals', const SavedMealsScreen()), // NEW
-            _navButton('Ingredients', const IngredientsScreen()),
-            _navButton('Meal Types', const MealTypesScreen()),
+            navButton('Create Meal', const CreateMealScreen()),
+            navButton('Saved Meals', const SavedMealsScreen()), // NEW
+            navButton('Ingredients', const IngredientsScreen()),
+            navButton('Meal Types', const MealTypesScreen()),
           ],
         ),
       ),

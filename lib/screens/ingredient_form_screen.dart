@@ -65,12 +65,14 @@ class _IngredientFormScreenState extends State<IngredientFormScreen> {
     );
 
     await _service.upsertIngredient(ingredient);
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
   Future<void> _delete() async {
     if (widget.existing != null) {
       await _service.deleteIngredient(widget.existing!.id);
+      if (!mounted) return;
       Navigator.of(context).pop();
     }
   }

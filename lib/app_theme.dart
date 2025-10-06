@@ -2,20 +2,20 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Pick a calm green/teal; change the seed to taste.
+  // tweak this to taste
   static const _seed = Color(0xFF00BFA5);
 
   static ThemeData _base(ColorScheme scheme) {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      // Rounded look
-      cardTheme: const CardTheme(
+
+      cardTheme: const CardThemeData(
         margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         elevation: 0,
         clipBehavior: Clip.antiAlias,
       ),
-      // Buttons
+
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
