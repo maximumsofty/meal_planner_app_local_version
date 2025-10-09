@@ -15,8 +15,9 @@ class FillerService {
     final prefs = await SharedPreferences.getInstance();
     final str = prefs.getString(_storageKey);
     if (str == null) return {};
-    return (jsonDecode(str) as Map<String, dynamic>)
-        .map((k, v) => MapEntry(k, v as String));
+    return (jsonDecode(str) as Map<String, dynamic>).map(
+      (k, v) => MapEntry(k, v as String),
+    );
   }
 
   Future<void> _saveRaw(Map<String, String> data) async {

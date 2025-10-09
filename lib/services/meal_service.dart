@@ -30,6 +30,17 @@ class MealService {
     await saveMeals(list);
   }
 
+  Future<void> upsertMeal(Meal meal) async {
+    final list = await loadMeals();
+    final idx = list.indexWhere((m) => m.id == meal.id);
+    if (idx >= 0) {
+      list[idx] = meal;
+    } else {
+      list.add(meal);
+    }
+    await saveMeals(list);
+  }
+
   Future<void> toggleFavorite(String mealId) async {
     final list = await loadMeals();
     final idx = list.indexWhere((m) => m.id == mealId);

@@ -57,10 +57,7 @@ class _MainPageState extends State<MainPage> {
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Welcome',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Welcome'),
           BottomNavigationBarItem(
             icon: Icon(Icons.view_list),
             label: 'Meal Types',
@@ -73,10 +70,7 @@ class _MainPageState extends State<MainPage> {
             icon: Icon(Icons.restaurant_menu),
             label: 'Create Meal',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bookmark),
-            label: 'Library',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark), label: 'Library'),
         ],
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,

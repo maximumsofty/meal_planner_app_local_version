@@ -6,6 +6,7 @@ import 'ingredients_screen.dart';
 import 'meal_types_screen.dart';
 import 'create_meal_screen.dart';
 import 'saved_meals_screen.dart';
+import 'reject_swap_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -13,18 +14,16 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // helper to avoid repeating boilerplate
-    ElevatedButton navButton(String label, Widget screen) =>
-        ElevatedButton.icon(
-          icon: const Icon(Icons.arrow_forward),
-          label: Text(label),
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => screen),
-          ),
-        );
+    ElevatedButton navButton(
+      String label,
+      Widget screen,
+    ) => ElevatedButton.icon(
+      icon: const Icon(Icons.arrow_forward),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+      onPressed: () =>
+          Navigator.push(context, MaterialPageRoute(builder: (_) => screen)),
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Meal Planner')),
@@ -42,6 +41,7 @@ class WelcomeScreen extends StatelessWidget {
             navButton('Saved Meals', const SavedMealsScreen()), // NEW
             navButton('Ingredients', const IngredientsScreen()),
             navButton('Meal Types', const MealTypesScreen()),
+            navButton('Reject Swap', const RejectSwapScreen()),
           ],
         ),
       ),

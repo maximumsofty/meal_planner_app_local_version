@@ -12,9 +12,12 @@ import '../services/meal_service.dart'; // NEW
 import '../models/meal.dart'; // NEW
 import 'dart:convert'; // for jsonEncode/jsonDecode
 import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/meal_ingredient_row.dart';
 
 class CreateMealScreen extends StatefulWidget {
-  const CreateMealScreen({super.key});
+  final Meal? initialMeal;
+
+  const CreateMealScreen({super.key, this.initialMeal});
 
   @override
   State<CreateMealScreen> createState() => _CreateMealScreenState();
@@ -41,29 +44,24 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   MealIngredient? _fillerProtein;
   MealIngredient? _fillerFat;
   bool _fillersExpanded = true;
+  late final bool _persistDraft;
 
   @override
   void initState() {
     super.initState();
+    _persistDraft = widget.initialMeal == null;
     _listController = ScrollController();
     _allIngredientsFuture = _ingredientService.loadIngredients();
     _allMealTypesFuture = _mealTypeService.loadMealTypes();
-    _allIngredientsFuture.then((ings) => _loadDraft(ings));
-    // If no draft loaded and user starts fresh, pre-select last fillers
     _allIngredientsFuture.then((ings) async {
-      final prefs = await SharedPreferences.getInstance();
-
-      Ingredient? getIng(String? id) {
-        if (id == null) return null;
-        for (final i in ings) {
-          if (i.id == id) return i;
+      if (widget.initialMeal != null) {
+        await _loadFromMeal(widget.initialMeal!, ings);
+      } else {
+        final loadedDraft = await _loadDraft(ings);
+        if (!loadedDraft) {
+          await _preselectLastFillers(ings);
         }
-        return null; // no match
       }
-
-      _chooseFiller('C', getIng(prefs.getString(_lastFillerKeyC)));
-      _chooseFiller('P', getIng(prefs.getString(_lastFillerKeyP)));
-      _chooseFiller('F', getIng(prefs.getString(_lastFillerKeyF)));
     });
   }
 
@@ -92,9 +90,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   double _sumFat(Iterable<MealIngredient> rows) =>
       rows.fold(0, (s, mi) => s + mi.fat);
 
-  double get _usedCarbsTotal => _sumCarbs(_mainRows) + _sumCarbs(_allFillers);
-  double get _usedProteinTotal => _sumProt(_mainRows) + _sumProt(_allFillers);
-  double get _usedFatTotal => _sumFat(_mainRows) + _sumFat(_allFillers);
+  double get _usedCarbsTotal => _sumCarbs(_mainRows);
+  double get _usedProteinTotal => _sumProt(_mainRows);
+  double get _usedFatTotal => _sumFat(_mainRows);
 
   double get _lockedCarbs => _sumCarbs(_lockedMain);
   double get _lockedProtein => _sumProt(_lockedMain);
@@ -119,6 +117,26 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     }
 
     return all.where(ok).toList();
+  }
+
+  Future<void> _preselectLastFillers(List<Ingredient> all) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    Ingredient? resolve(String? id) {
+      if (id == null) return null;
+      for (final ing in all) {
+        if (ing.id == id) return ing;
+      }
+      return null;
+    }
+
+    final carb = resolve(prefs.getString(_lastFillerKeyC));
+    final protein = resolve(prefs.getString(_lastFillerKeyP));
+    final fat = resolve(prefs.getString(_lastFillerKeyF));
+
+    if (carb != null) _chooseFiller('C', carb);
+    if (protein != null) _chooseFiller('P', protein);
+    if (fat != null) _chooseFiller('F', fat);
   }
 
   Future<void> _saveLastFiller(String macro, Ingredient? ing) async {
@@ -164,8 +182,8 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       }
       _recalcFillerWeights();
     });
-    _saveDraft(); // NEW
-    _saveLastFiller(macro, ing); // NEW – remember choice
+    _persist();
+    _saveLastFiller(macro, ing);
   }
 
   // ── Reset builder ─────────────────────────────────────────────────────
@@ -199,7 +217,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     });
 
     _recalcFillerWeights(); // safe; returns early when meal type is null
-    await _saveDraft(); // persist the cleared state (fillers remain)
+    if (_persistDraft) {
+      await _saveDraft(); // persist the cleared state (fillers remain)
+    }
 
     if (!mounted) return;
     ScaffoldMessenger.of(
@@ -209,50 +229,68 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
 
   // ── Save-meal dialog ──────────────────────────────────────────────────
   Future<void> _showSaveDialog() async {
+    final editingMeal = widget.initialMeal;
+    final isEditing = editingMeal != null;
+
     final nameCtl = TextEditingController(
-      text: 'Meal ${DateTime.now().toIso8601String().substring(0, 16)}',
+      text: isEditing
+          ? editingMeal!.name
+          : 'Meal ${DateTime.now().toIso8601String().substring(0, 16)}',
     );
-    bool fav = false;
+    bool fav = editingMeal?.favorite ?? false;
+    bool saveAsNew = false;
 
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Save Meal'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtl,
-              decoration: const InputDecoration(labelText: 'Meal name'),
-            ),
-            Row(
-              children: [
-                Checkbox(
-                  value: fav,
-                  onChanged: (v) {
-                    fav = v ?? false;
-                    (ctx as Element).markNeedsBuild();
-                  },
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(isEditing ? 'Save Meal' : 'Save Meal'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: nameCtl,
+                decoration: const InputDecoration(labelText: 'Meal name'),
+              ),
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                value: fav,
+                onChanged: (v) => setDialogState(() => fav = v ?? false),
+                title: const Text('Favorite'),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (isEditing)
+                SwitchListTile(
+                  value: saveAsNew,
+                  onChanged: (v) => setDialogState(() => saveAsNew = v),
+                  title: const Text('Save as new meal'),
+                  subtitle: const Text(
+                    'Keep the original meal and create a copy.',
+                  ),
+                  contentPadding: EdgeInsets.zero,
                 ),
-                const Text('Favorite'),
-              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
 
-    if (ok != true) return;
+    if (ok != true) {
+      nameCtl.dispose();
+      return;
+    }
 
     // build rows list in visible order: fillers -> unlocked -> locked
     final rows = [..._allFillers, ..._unlockedMain, ..._lockedMain]
@@ -263,24 +301,41 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
         )
         .toList();
 
+    final now = DateTime.now();
+    final trimmedName = nameCtl.text.trim().isEmpty
+        ? 'Meal ${now.toIso8601String().substring(0, 16)}'
+        : nameCtl.text.trim();
+
     final meal = Meal(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: nameCtl.text.trim(),
+      id: (!isEditing || saveAsNew)
+          ? now.millisecondsSinceEpoch.toString()
+          : editingMeal!.id,
+      name: trimmedName,
       favorite: fav,
-      createdAt: DateTime.now(),
+      createdAt: now,
       mealTypeId: _selectedMealType!.id,
       rows: rows,
     );
 
-    await _mealService.addMeal(meal);
-    // clear draft
-    final prefs = await SharedPreferences.getInstance();
-    prefs.remove(_draftKey);
+    if (isEditing && !saveAsNew) {
+      await _mealService.upsertMeal(meal);
+    } else {
+      await _mealService.addMeal(meal);
+    }
+
+    if (_persistDraft) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_draftKey);
+    }
 
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Meal saved')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isEditing && !saveAsNew ? 'Meal updated' : 'Meal saved'),
+      ),
+    );
+
+    nameCtl.dispose();
   }
 
   // ───────────────── recalc filler weights (fixed types) ─────────────────
@@ -302,60 +357,106 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       'fillerC': _fillerCarb?.ingredient.toJson(),
       'fillerP': _fillerProtein?.ingredient.toJson(),
       'fillerF': _fillerFat?.ingredient.toJson(),
+      'fillersExpanded': _fillersExpanded,
     };
 
     await prefs.setString(_draftKey, jsonEncode(draft));
   }
 
   // ── Draft restoration (awaits loadMealTypes) ──────────────────────────
-  Future<void> _loadDraft(List<Ingredient> allIngredients) async {
+  Future<bool> _loadDraft(List<Ingredient> allIngredients) async {
+    if (!_persistDraft) return false;
+
     final prefs = await SharedPreferences.getInstance();
     final str = prefs.getString(_draftKey);
-    if (str == null) return;
+    if (str == null) return false;
 
-    final draft = jsonDecode(str);
-
-    // Fetch meal types so we can match the saved ID
+    final draft = jsonDecode(str) as Map<String, dynamic>;
     final mealTypes = await _mealTypeService.loadMealTypes();
 
     setState(() {
-      // MealType
-      final mtId = draft['mealTypeId'];
+      final mtId = draft['mealTypeId'] as String?;
       if (mtId != null) {
-        _selectedMealType = mealTypes.firstWhere(
-          (mt) => mt.id == mtId,
-          orElse: () => _selectedMealType!,
-        );
+        final idx = mealTypes.indexWhere((mt) => mt.id == mtId);
+        if (idx != -1) {
+          _selectedMealType = mealTypes[idx];
+        }
       }
 
-      // Main rows
       _mainRows.clear();
-      for (final row in draft['mainRows'] ?? []) {
-        final ingJson = row['ingredient'] as Map<String, dynamic>;
-        final ing = allIngredients.firstWhere(
+      for (final row in draft['mainRows'] as List<dynamic>? ?? []) {
+        final rowMap = row as Map<String, dynamic>;
+        final ingJson = rowMap['ingredient'] as Map<String, dynamic>;
+        final ingredient = allIngredients.firstWhere(
           (i) => i.id == ingJson['id'],
           orElse: () => Ingredient.fromJson(ingJson),
         );
-        _mainRows.add(
-          MealIngredient(
-            ingredient: ing,
-            weight: (row['weight'] as num).toDouble(),
-          )..locked = row['locked'] as bool,
-        );
+        final mi = MealIngredient(
+          ingredient: ingredient,
+          weight: (rowMap['weight'] as num).toDouble(),
+        )..locked = rowMap['locked'] as bool;
+        _mainRows.add(mi);
       }
 
-      // Fillers
-      Ingredient? getIng(Map<String, dynamic>? j) => j == null
+      Ingredient? resolve(Map<String, dynamic>? json) => json == null
           ? null
           : allIngredients.firstWhere(
-              (i) => i.id == j['id'],
-              orElse: () => Ingredient.fromJson(j),
+              (i) => i.id == json['id'],
+              orElse: () => Ingredient.fromJson(json),
             );
 
-      _chooseFiller('C', getIng(draft['fillerC']));
-      _chooseFiller('P', getIng(draft['fillerP']));
-      _chooseFiller('F', getIng(draft['fillerF']));
+      final fillerC = resolve(draft['fillerC'] as Map<String, dynamic>?);
+      final fillerP = resolve(draft['fillerP'] as Map<String, dynamic>?);
+      final fillerF = resolve(draft['fillerF'] as Map<String, dynamic>?);
 
+      _fillerCarb = fillerC == null
+          ? null
+          : (MealIngredient(ingredient: fillerC, weight: 0)..locked = true);
+      _fillerProtein = fillerP == null
+          ? null
+          : (MealIngredient(ingredient: fillerP, weight: 0)..locked = true);
+      _fillerFat = fillerF == null
+          ? null
+          : (MealIngredient(ingredient: fillerF, weight: 0)..locked = true);
+
+      _fillersExpanded = draft['fillersExpanded'] as bool? ?? true;
+      _recalcFillerWeights();
+    });
+
+    return true;
+  }
+
+  Future<void> _loadFromMeal(Meal meal, List<Ingredient> allIngredients) async {
+    final mealTypes = await _mealTypeService.loadMealTypes();
+
+    setState(() {
+      final idx = mealTypes.indexWhere((mt) => mt.id == meal.mealTypeId);
+      if (idx != -1) {
+        _selectedMealType = mealTypes[idx];
+      } else {
+        _selectedMealType = null;
+      }
+
+      _mainRows
+        ..clear()
+        ..addAll(
+          meal.rows.map((row) {
+            final ingredient = allIngredients.firstWhere(
+              (ing) => ing.id == row.ingredient.id,
+              orElse: () => row.ingredient,
+            );
+            final mi = MealIngredient(
+              ingredient: ingredient,
+              weight: row.weight,
+            )..locked = row.locked;
+            return mi;
+          }),
+        );
+
+      _fillerCarb = null;
+      _fillerProtein = null;
+      _fillerFat = null;
+      _fillersExpanded = true;
       _recalcFillerWeights();
     });
   }
@@ -406,11 +507,16 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     );
   }
 
+  void _persist() {
+    if (!_persistDraft) return;
+    _saveDraft();
+  }
+
   // ─────────────────── row callbacks ────────────────────────────────────
   void _onRowChanged() {
     _recalcFillerWeights();
     setState(() {});
-    _saveDraft(); // NEW
+    _persist();
   }
 
   void _addMainRow(Ingredient ing) {
@@ -418,7 +524,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       _mainRows.add(MealIngredient(ingredient: ing, weight: ing.defaultWeight));
       _recalcFillerWeights();
     });
-    _saveDraft(); // NEW
+    _persist();
   }
 
   void _toggleLock(MealIngredient mi) {
@@ -426,7 +532,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       mi.locked = !mi.locked;
       _recalcFillerWeights();
     });
-    _saveDraft(); // NEW
+    _persist();
   }
 
   void _removeRow(MealIngredient mi) {
@@ -434,7 +540,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       _mainRows.remove(mi);
       _recalcFillerWeights();
     });
-    _saveDraft(); // NEW
+    _persist();
   }
 
   // ─────────────────── UI build ─────────────────────────────────────────
@@ -493,7 +599,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                               .map(
                                 (mt) => DropdownMenuItem(
                                   value: mt,
-                                  child: Text(mt.name),
+                                  child: Text(
+                                    '${mt.name}  (${_mealTypeRatio(mt)})',
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -633,10 +741,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                         child: const Text('Unlocked'),
                       ),
                       ..._unlockedMain.map(
-                        (mi) => _IngredientRow(
+                        (mi) => MealIngredientRow(
                           key: ValueKey(mi),
                           mealIngredient: mi,
-                          mealType: _selectedMealType!,
                           remainingCarbs: _remainAfterLocked(
                             _selectedMealType!.carbs,
                             _lockedCarbs,
@@ -673,10 +780,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                         child: const Text('Locked'),
                       ),
                       ..._lockedMain.map(
-                        (mi) => _IngredientRow(
+                        (mi) => MealIngredientRow(
                           key: ValueKey(mi),
                           mealIngredient: mi,
-                          mealType: _selectedMealType!,
                           remainingCarbs: 0,
                           remainingProtein: 0,
                           remainingFat: 0,
@@ -739,22 +845,36 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   Widget _remainChip(String lbl, double used, double tgt) {
     final rawRemain = tgt - used;
     final remainRounded = double.parse(rawRemain.toStringAsFixed(1));
-    final isZero = remainRounded == 0.0;
-    final over = remainRounded < 0 && !isZero;
-    final scheme = Theme.of(context).colorScheme;
 
-    // Tonal backgrounds for quick scanning
-    final bg = over ? scheme.errorContainer : scheme.secondaryContainer;
-    final fg = over ? scheme.onErrorContainer : scheme.onSecondaryContainer;
+    final scheme = Theme.of(context).colorScheme;
+    final isExact = remainRounded == 0.0;
+    final isOver = remainRounded < 0;
+
+    Color background;
+    Color foreground;
+    String status;
+
+    if (isOver) {
+      background = scheme.errorContainer;
+      foreground = scheme.onErrorContainer;
+      status = '${remainRounded.abs().toStringAsFixed(1)} over';
+    } else if (isExact) {
+      background = scheme.secondaryContainer;
+      foreground = scheme.onSecondaryContainer;
+      status = 'On target';
+    } else {
+      background = scheme.surfaceContainerHighest;
+      foreground = scheme.onSurfaceVariant;
+      status = '${remainRounded.toStringAsFixed(1)} left';
+    }
 
     final text =
-        '$lbl  ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)}  '
-        '(${remainRounded.abs().toStringAsFixed(1)} ${over ? 'over' : 'left'})';
+        '$lbl  ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)}  ($status)';
 
     return Chip(
       label: Text(text),
-      backgroundColor: bg,
-      labelStyle: TextStyle(color: fg),
+      backgroundColor: background,
+      labelStyle: TextStyle(color: foreground),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
@@ -870,6 +990,27 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     );
   }
 
+  String _mealTypeRatio(MealType mt) =>
+      _formatFatRatio(mt.fat, mt.carbs, mt.protein);
+
+  String _formatFatRatio(double fat, double carbs, double protein) {
+    final sum = carbs + protein;
+    if (sum <= 0) {
+      if (fat <= 0) return '0:1';
+      return 'inf:1';
+    }
+
+    final ratio = fat / sum;
+    return '${_trimmedNumber(ratio)}:1';
+  }
+
+  String _trimmedNumber(double value) {
+    final fixed2 = value.toStringAsFixed(2);
+    if (fixed2.endsWith('.00')) return value.toStringAsFixed(0);
+    if (fixed2.endsWith('0')) return value.toStringAsFixed(1);
+    return fixed2;
+  }
+
   // ── Meal summary section ─────────────────────────────────────────────
   List<Widget> _summarySection() {
     final rowsInOrder = [..._allFillers, ..._unlockedMain, ..._lockedMain];
@@ -898,242 +1039,5 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       ),
       const SizedBox(height: 12),
     ];
-  }
-}
-
-// ───────────────────── Ingredient Row widget ────────────────────────────
-class _IngredientRow extends StatefulWidget {
-  final MealIngredient mealIngredient;
-  final MealType mealType;
-  final double remainingCarbs;
-  final double remainingProtein;
-  final double remainingFat;
-  final bool editable;
-  final VoidCallback onChange;
-  final VoidCallback? onDelete;
-  final VoidCallback onLockToggle;
-
-  const _IngredientRow({
-    required super.key,
-    required this.mealIngredient,
-    required this.mealType,
-    required this.remainingCarbs,
-    required this.remainingProtein,
-    required this.remainingFat,
-    required this.editable,
-    required this.onChange,
-    required this.onDelete,
-    required this.onLockToggle,
-  });
-
-  @override
-  State<_IngredientRow> createState() => _IngredientRowState();
-}
-
-class _IngredientRowState extends State<_IngredientRow> {
-  late final TextEditingController _gCtl;
-  late final TextEditingController _cPctCtl;
-  late final TextEditingController _pPctCtl;
-  late final TextEditingController _fPctCtl;
-  late final FocusNode _gFocus;
-  late final FocusNode _cFocus;
-  late final FocusNode _pFocus;
-  late final FocusNode _fFocus;
-  late final VoidCallback _gFocusListener;
-  late final VoidCallback _cFocusListener;
-  late final VoidCallback _pFocusListener;
-  late final VoidCallback _fFocusListener;
-
-  MealIngredient get mi => widget.mealIngredient;
-  Ingredient get ing => mi.ingredient;
-
-  @override
-  void initState() {
-    super.initState();
-    _gCtl = TextEditingController(text: mi.weight.toStringAsFixed(1));
-    _cPctCtl = TextEditingController();
-    _pPctCtl = TextEditingController();
-    _fPctCtl = TextEditingController();
-    _gFocus = FocusNode();
-    _cFocus = FocusNode();
-    _pFocus = FocusNode();
-    _fFocus = FocusNode();
-
-    _gFocusListener = () {
-      if (!_gFocus.hasFocus && widget.editable) {
-        _weightSubmit(_gCtl.text);
-      }
-    };
-    _cFocusListener = () {
-      if (!_cFocus.hasFocus && widget.editable) {
-        _pctSubmit('C', _cPctCtl.text);
-      }
-    };
-    _pFocusListener = () {
-      if (!_pFocus.hasFocus && widget.editable) {
-        _pctSubmit('P', _pPctCtl.text);
-      }
-    };
-    _fFocusListener = () {
-      if (!_fFocus.hasFocus && widget.editable) {
-        _pctSubmit('F', _fPctCtl.text);
-      }
-    };
-
-    _gFocus.addListener(_gFocusListener);
-    _cFocus.addListener(_cFocusListener);
-    _pFocus.addListener(_pFocusListener);
-    _fFocus.addListener(_fFocusListener);
-    _refreshPct();
-  }
-
-  @override
-  void didUpdateWidget(covariant _IngredientRow old) {
-    super.didUpdateWidget(old);
-    _refreshPct();
-  }
-
-  @override
-  void dispose() {
-    _gFocus.removeListener(_gFocusListener);
-    _cFocus.removeListener(_cFocusListener);
-    _pFocus.removeListener(_pFocusListener);
-    _fFocus.removeListener(_fFocusListener);
-    _gFocus.dispose();
-    _cFocus.dispose();
-    _pFocus.dispose();
-    _fFocus.dispose();
-    _gCtl.dispose();
-    _cPctCtl.dispose();
-    _pPctCtl.dispose();
-    _fPctCtl.dispose();
-    super.dispose();
-  }
-
-  void _refreshPct() {
-    String pct(double part, double denom) =>
-        denom == 0 ? '0.0' : (part / denom * 100).toStringAsFixed(1);
-    _cPctCtl.text = pct(mi.carbs, widget.remainingCarbs);
-    _pPctCtl.text = pct(mi.protein, widget.remainingProtein);
-    _fPctCtl.text = pct(mi.fat, widget.remainingFat);
-  }
-
-  void _selectAll(TextEditingController c) =>
-      c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
-
-  double _gPerG(double macro) => macro / ing.defaultWeight;
-
-  void _setWeight(double w) {
-    mi.weight = w;
-    _gCtl.text = w.toStringAsFixed(1);
-    _refreshPct();
-    widget.onChange();
-  }
-
-  void _weightSubmit(String v) {
-    if (!widget.editable) return;
-    final d = double.tryParse(v);
-    if (d != null && d > 0) _setWeight(d);
-  }
-
-  void _pctSubmit(String macro, String v) {
-    if (!widget.editable) return;
-    final pct = double.tryParse(v);
-    if (pct == null || pct < 0) return;
-
-    double newW = mi.weight;
-    switch (macro) {
-      case 'C':
-        if (ing.carbs == 0 || widget.remainingCarbs == 0) return;
-        newW = (widget.remainingCarbs * pct / 100) / _gPerG(ing.carbs);
-        break;
-      case 'P':
-        if (ing.protein == 0 || widget.remainingProtein == 0) return;
-        newW = (widget.remainingProtein * pct / 100) / _gPerG(ing.protein);
-        break;
-      case 'F':
-        if (ing.fat == 0 || widget.remainingFat == 0) return;
-        newW = (widget.remainingFat * pct / 100) / _gPerG(ing.fat);
-        break;
-    }
-    _setWeight(newW);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: IconButton(
-        icon: Icon(mi.locked ? Icons.lock : Icons.lock_open),
-        onPressed: widget.onLockToggle,
-      ),
-      title: Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Text(ing.name),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text('g:'),
-              const SizedBox(width: 4),
-              SizedBox(
-                width: 70,
-                child: TextField(
-                  controller: _gCtl,
-                  enabled: widget.editable,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  focusNode: _gFocus,
-                  onSubmitted: _weightSubmit,
-                  onTap: () => _selectAll(_gCtl),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _pctField('C', _cPctCtl, ing.carbs == 0, _cFocus),
-              const SizedBox(width: 8),
-              _pctField('P', _pPctCtl, ing.protein == 0, _pFocus),
-              const SizedBox(width: 8),
-              _pctField('F', _fPctCtl, ing.fat == 0, _fFocus),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  'Cal ${mi.calories.toStringAsFixed(1)}',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      trailing: widget.onDelete != null
-          ? IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: widget.onDelete,
-            )
-          : null,
-    );
-  }
-
-  Widget _pctField(
-    String lbl,
-    TextEditingController c,
-    bool disabled,
-    FocusNode focus,
-  ) {
-    return SizedBox(
-      width: 70,
-      child: TextField(
-        controller: c,
-        enabled: !disabled && widget.editable,
-        focusNode: focus,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(labelText: '$lbl %', isDense: true),
-        onTap: () => _selectAll(c),
-        onSubmitted: (v) => _pctSubmit(lbl, v),
-      ),
-    );
   }
 }

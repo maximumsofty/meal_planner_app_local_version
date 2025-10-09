@@ -19,19 +19,25 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
       inputDecorationTheme: const InputDecorationTheme(
@@ -56,9 +62,11 @@ class AppTheme {
     );
   }
 
-  static ThemeData get light =>
-      _base(ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.light));
+  static ThemeData get light => _base(
+    ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.light),
+  );
 
-  static ThemeData get dark =>
-      _base(ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.dark));
+  static ThemeData get dark => _base(
+    ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.dark),
+  );
 }

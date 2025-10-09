@@ -8,8 +8,8 @@ class Ingredient {
   String name;
   double defaultWeight; // grams
   double calories;
-  double carbs;   // grams
-  double fat;     // grams
+  double carbs; // grams
+  double fat; // grams
   double protein; // grams
 
   Ingredient({

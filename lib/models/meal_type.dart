@@ -7,9 +7,9 @@ import 'dart:convert';
 class MealType {
   final String id;
   String name;
-  double carbs;   // in grams
+  double carbs; // in grams
   double protein; // in grams
-  double fat;     // in grams
+  double fat; // in grams
 
   MealType({
     required this.id,
@@ -35,10 +35,10 @@ class MealType {
       fat: fat ?? this.fat,
     );
   }
+
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MealType && other.id == id;
+      identical(this, other) || other is MealType && other.id == id;
 
   @override
   int get hashCode => id.hashCode;

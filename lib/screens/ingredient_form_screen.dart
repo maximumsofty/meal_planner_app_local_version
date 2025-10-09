@@ -27,14 +27,16 @@ class _IngredientFormScreenState extends State<IngredientFormScreen> {
     super.initState();
     final i = widget.existing;
     _nameController = TextEditingController(text: i?.name ?? '');
-    _weightController =
-        TextEditingController(text: i?.defaultWeight.toString() ?? '');
-    _caloriesController =
-        TextEditingController(text: i?.calories.toString() ?? '');
-    _carbsController =
-        TextEditingController(text: i?.carbs.toString() ?? '');
-    _proteinController =
-        TextEditingController(text: i?.protein.toString() ?? '');
+    _weightController = TextEditingController(
+      text: i?.defaultWeight.toString() ?? '',
+    );
+    _caloriesController = TextEditingController(
+      text: i?.calories.toString() ?? '',
+    );
+    _carbsController = TextEditingController(text: i?.carbs.toString() ?? '');
+    _proteinController = TextEditingController(
+      text: i?.protein.toString() ?? '',
+    );
     _fatController = TextEditingController(text: i?.fat.toString() ?? '');
   }
 
@@ -52,8 +54,8 @@ class _IngredientFormScreenState extends State<IngredientFormScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final id = widget.existing?.id ??
-        DateTime.now().millisecondsSinceEpoch.toString();
+    final id =
+        widget.existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
     final ingredient = Ingredient(
       id: id,
       name: _nameController.text.trim(),
@@ -93,7 +95,8 @@ class _IngredientFormScreenState extends State<IngredientFormScreen> {
                   builder: (ctx) => AlertDialog(
                     title: const Text('Delete Ingredient'),
                     content: const Text(
-                        'Are you sure you want to delete this ingredient?'),
+                      'Are you sure you want to delete this ingredient?',
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(ctx).pop(false),
@@ -128,58 +131,59 @@ class _IngredientFormScreenState extends State<IngredientFormScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _weightController,
-                decoration:
-                    const InputDecoration(labelText: 'Default Weight (g)'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) =>
-                    (v == null || double.tryParse(v) == null)
-                        ? 'Invalid'
-                        : null,
+                decoration: const InputDecoration(
+                  labelText: 'Default Weight (g)',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => (v == null || double.tryParse(v) == null)
+                    ? 'Invalid'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _caloriesController,
                 decoration: const InputDecoration(labelText: 'Calories'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) =>
-                    (v == null || double.tryParse(v) == null)
-                        ? 'Invalid'
-                        : null,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => (v == null || double.tryParse(v) == null)
+                    ? 'Invalid'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _carbsController,
                 decoration: const InputDecoration(labelText: 'Carbs (g)'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) =>
-                    (v == null || double.tryParse(v) == null)
-                        ? 'Invalid'
-                        : null,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => (v == null || double.tryParse(v) == null)
+                    ? 'Invalid'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _proteinController,
                 decoration: const InputDecoration(labelText: 'Protein (g)'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) =>
-                    (v == null || double.tryParse(v) == null)
-                        ? 'Invalid'
-                        : null,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => (v == null || double.tryParse(v) == null)
+                    ? 'Invalid'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _fatController,
                 decoration: const InputDecoration(labelText: 'Fat (g)'),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) =>
-                    (v == null || double.tryParse(v) == null)
-                        ? 'Invalid'
-                        : null,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: (v) => (v == null || double.tryParse(v) == null)
+                    ? 'Invalid'
+                    : null,
               ),
               const SizedBox(height: 24),
               Row(
@@ -190,10 +194,7 @@ class _IngredientFormScreenState extends State<IngredientFormScreen> {
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 16),
-                  ElevatedButton(
-                    onPressed: _save,
-                    child: const Text('Save'),
-                  ),
+                  ElevatedButton(onPressed: _save, child: const Text('Save')),
                 ],
               ),
             ],

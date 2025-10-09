@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import '../models/meal.dart';
 import '../services/meal_service.dart';
+import 'create_meal_screen.dart';
 
 class SavedMealsScreen extends StatefulWidget {
   const SavedMealsScreen({super.key});
@@ -75,8 +76,8 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
                 }
                 final meals = snap.data!;
                 final query = _searchCtl.text.toLowerCase();
-                final list = meals.where((m) =>
-                        m.name.toLowerCase().contains(query))
+                final list = meals
+                    .where((m) => m.name.toLowerCase().contains(query))
                     .toList();
 
                 if (list.isEmpty) {
@@ -99,14 +100,24 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
                           meal.favorite
                               ? Icons.star
                               : Icons.star_border_outlined,
-                          color:
-                              meal.favorite ? Colors.amber : Colors.grey,
+                          color: meal.favorite ? Colors.amber : Colors.grey,
                         ),
                         onPressed: () => _toggleFav(meal.id),
                       ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _delete(meal.id),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Edit meal',
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _editMeal(meal),
+                          ),
+                          IconButton(
+                            tooltip: 'Delete meal',
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _delete(meal.id),
+                          ),
+                        ],
                       ),
                       onTap: () => _showDetails(context, meal),
                     );
@@ -118,6 +129,14 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _editMeal(Meal meal) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => CreateMealScreen(initialMeal: meal)),
+    );
+    _load();
+    setState(() {});
   }
 
   // simple read-only dialog
@@ -143,7 +162,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close'),
-          )
+          ),
         ],
       ),
     );

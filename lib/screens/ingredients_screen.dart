@@ -55,7 +55,7 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
         title: const Text('Reset ingredients?'),
         content: const Text(
           'This will replace your current ingredients with the built-in defaults. '
-          'This cannot be undone. Continue?'
+          'This cannot be undone. Continue?',
         ),
         actions: [
           TextButton(
@@ -119,9 +119,7 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ingredients'),
-      ),
+      appBar: AppBar(title: const Text('Ingredients')),
       body: FutureBuilder<List<Ingredient>>(
         future: _ingredientsFuture,
         builder: (context, snapshot) {
@@ -183,7 +181,10 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
                             ),
                             onTap: () => _navigateToForm(ing),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent),
+                              icon: const Icon(
+                                Icons.delete,
+                                color: Colors.redAccent,
+                              ),
                               onPressed: () => _confirmDelete(ing),
                             ),
                           );
