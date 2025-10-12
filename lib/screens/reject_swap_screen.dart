@@ -871,10 +871,15 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
         (mi) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(mi.ingredient.name),
               Text('${mi.weight.toStringAsFixed(1)} g'),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  mi.ingredient.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
             ],
           ),
         ),
