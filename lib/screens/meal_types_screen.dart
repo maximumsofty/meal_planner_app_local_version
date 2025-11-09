@@ -16,6 +16,7 @@ class _MealTypesScreenState extends State<MealTypesScreen> {
   final _service = MealTypeService();
   late Future<List<MealType>> _mealTypesFuture;
   List<MealType> _mealTypes = const [];
+  bool _showDelete = false;
 
   @override
   void initState() {
@@ -40,7 +41,18 @@ class _MealTypesScreenState extends State<MealTypesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Meal Types')),
+      appBar: AppBar(
+        title: const Text('Meal Types'),
+        actions: [
+          IconButton(
+            tooltip: _showDelete
+                ? 'Hide delete buttons'
+                : 'Show delete buttons',
+            icon: Icon(_showDelete ? Icons.check : Icons.delete_forever),
+            onPressed: () => setState(() => _showDelete = !_showDelete),
+          ),
+        ],
+      ),
       body: FutureBuilder<List<MealType>>(
         future: _mealTypesFuture,
         builder: (context, snapshot) {
@@ -75,7 +87,17 @@ class _MealTypesScreenState extends State<MealTypesScreen> {
                     'Protein: ${mt.protein.toStringAsFixed(2)}g • '
                     'Fat: ${mt.fat.toStringAsFixed(2)}g',
                   ),
-                  trailing: const Icon(Icons.drag_handle),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_showDelete)
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _confirmDelete(mt),
+                        ),
+                      const Icon(Icons.drag_handle),
+                    ],
+                  ),
                   onTap: () => _navigateToForm(mt),
                 );
               },
@@ -109,5 +131,31 @@ class _MealTypesScreenState extends State<MealTypesScreen> {
     if (asFixed2.endsWith('.00')) return value.toStringAsFixed(0);
     if (asFixed2.endsWith('0')) return value.toStringAsFixed(1);
     return asFixed2;
+  }
+
+  Future<void> _confirmDelete(MealType mealType) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete meal type?'),
+        content: Text('Are you sure you want to delete "${mealType.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      await _service.deleteMealType(mealType.id);
+      _load();
+      setState(() {});
+    }
   }
 }

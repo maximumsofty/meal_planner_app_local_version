@@ -26,7 +26,7 @@ class WelcomeScreen extends StatelessWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Meal Planner')),
+      appBar: AppBar(title: const Text('Keto Meal Planner')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
