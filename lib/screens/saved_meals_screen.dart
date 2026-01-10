@@ -4,9 +4,9 @@
 // delete meal, view read-only details.
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../models/meal.dart';
 import '../services/meal_service.dart';
-import 'create_meal_screen.dart';
 
 class SavedMealsScreen extends StatefulWidget {
   const SavedMealsScreen({super.key});
@@ -132,9 +132,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
   }
 
   Future<void> _editMeal(Meal meal) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => CreateMealScreen(initialMeal: meal)),
-    );
+    await context.push('/create', extra: meal);
     _load();
     setState(() {});
   }

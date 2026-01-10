@@ -1,16 +1,21 @@
 # meal_planner_app_local_version
 
-A new Flutter project.
+Keto meal planner built with Flutter; configured for mobile/desktop and now with a web target.
 
-## Getting Started
+## Run it
+- Install Flutter (stable) and get packages: `flutter pub get`.
+- Web dev server: `flutter run -d chrome` (or `edge`/`safari` depending on platform).
+- Desktop: `flutter run -d macos` or `flutter run -d windows` if enabled locally.
+- Mobile: `flutter run -d ios`/`android` when those platforms are set up.
 
-This project is a starting point for a Flutter application.
+## Build for the browser
+- Release build: `flutter build web --release` (outputs to `build/web`).
+- Serve the build locally: `python -m http.server 8080 -d build/web` or any static host (Firebase Hosting, Vercel, etc.).
+- Persistence uses `shared_preferences` (LocalStorage in the browser), so data is per-browser and subject to storage limits.
 
-A few resources to get you started if this is your first Flutter project:
+## Routing
+- URL-friendly navigation via `go_router`; main paths: `/`, `/create`, `/saved`, `/ingredients`, `/meal-types`, `/reject`.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Next
+- Tune page layouts for wide screens (max-width wrapping, column layouts).
+- Add PWA polish (custom icons, offline caching/service worker) if desired.
