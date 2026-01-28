@@ -4,17 +4,44 @@ import 'package:go_router/go_router.dart';
 import 'models/meal.dart';
 import 'screens/create_meal_screen.dart';
 import 'screens/ingredients_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/meal_types_screen.dart';
 import 'screens/reject_swap_screen.dart';
 import 'screens/saved_meals_screen.dart';
 import 'screens/welcome_screen.dart';
+import 'services/auth_service.dart';
 
 class AppRouter {
   AppRouter();
 
+  final _authService = AuthService();
+
   late final GoRouter router = GoRouter(
     initialLocation: '/',
+    refreshListenable: GoRouterRefreshStream(_authService.authStateChanges),
+    redirect: (context, state) {
+      final isLoggedIn = _authService.isLoggedIn;
+      final isLoggingIn = state.matchedLocation == '/login';
+
+      // If not logged in and not on login page, redirect to login
+      if (!isLoggedIn && !isLoggingIn) {
+        return '/login';
+      }
+
+      // If logged in and on login page, redirect to home
+      if (isLoggedIn && isLoggingIn) {
+        return '/';
+      }
+
+      return null;
+    },
     routes: [
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        pageBuilder: (context, state) =>
+            const NoTransitionPage(child: LoginScreen()),
+      ),
       ShellRoute(
         builder: (context, state, child) =>
             _AppShell(location: state.uri.path, child: child),
@@ -65,6 +92,22 @@ class AppRouter {
   );
 }
 
+// Helper class to convert Stream to Listenable for GoRouter refresh
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+
+  late final dynamic _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
+
 class _NavItem {
   final String path;
   final String label;
@@ -103,6 +146,30 @@ class _AppShell extends StatelessWidget {
     }
   }
 
+  Future<void> _signOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await AuthService().signOut();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final useRail = MediaQuery.of(context).size.width >= 900;
@@ -110,8 +177,7 @@ class _AppShell extends StatelessWidget {
 
     final centeredChild = SafeArea(
       top: true,
-      bottom:
-          useRail, // rail view should respect bottom insets; nav bar handles its own
+      bottom: useRail,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           horizontalPad,
@@ -137,6 +203,19 @@ class _AppShell extends StatelessWidget {
                 selectedIndex: _currentIndex,
                 onDestinationSelected: (index) => _onSelect(context, index),
                 labelType: NavigationRailLabelType.all,
+                trailing: Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: IconButton(
+                        icon: const Icon(Icons.logout),
+                        tooltip: 'Sign Out',
+                        onPressed: () => _signOut(context),
+                      ),
+                    ),
+                  ),
+                ),
                 destinations: _navItems
                     .map(
                       (item) => NavigationRailDestination(
@@ -154,6 +233,16 @@ class _AppShell extends StatelessWidget {
     }
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Keto Meal Builder'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign Out',
+            onPressed: () => _signOut(context),
+          ),
+        ],
+      ),
       body: centeredChild,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,

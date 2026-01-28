@@ -1,68 +1,84 @@
 // lib/services/ingredient_service.dart
 
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/ingredient.dart';
 import '../data/default_ingredients.dart';
 
-/// Service for loading and saving Ingredient data locally.
+/// Service for loading and saving Ingredient data to Firestore.
 class IngredientService {
-  static const _storageKey = 'ingredients';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  String? get _userId => _auth.currentUser?.uid;
+
+  CollectionReference<Map<String, dynamic>> get _collection {
+    if (_userId == null) throw Exception('User not logged in');
+    return _firestore.collection('users').doc(_userId).collection('ingredients');
+  }
 
   /// Loads the list of saved Ingredients.
   /// If none exist, seeds from [defaultIngredients] and returns them.
   Future<List<Ingredient>> loadIngredients() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_storageKey);
+    if (_userId == null) return [];
 
-    if (jsonString == null) {
-      // First run (or storage cleared): seed defaults
-      await saveIngredients(defaultIngredients);
+    final snapshot = await _collection.get();
+
+    if (snapshot.docs.isEmpty) {
+      // First run: seed defaults
+      await _seedDefaults();
       return defaultIngredients;
     }
 
-    final List<dynamic> decoded = jsonDecode(jsonString) as List<dynamic>;
-    return decoded
-        .map((e) => Ingredient.fromJson(e as Map<String, dynamic>))
+    return snapshot.docs
+        .map((doc) => Ingredient.fromJson(doc.data()))
         .toList();
   }
 
-  /// Saves the given list of Ingredients.
-  Future<void> saveIngredients(List<Ingredient> ingredients) async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = ingredients.map((i) => i.toJson()).toList();
-    final jsonString = jsonEncode(jsonList);
-    await prefs.setString(_storageKey, jsonString);
+  /// Seeds default ingredients for new users
+  Future<void> _seedDefaults() async {
+    final batch = _firestore.batch();
+    for (final ingredient in defaultIngredients) {
+      batch.set(_collection.doc(ingredient.id), ingredient.toJson());
+    }
+    await batch.commit();
   }
 
-  /// Adds or updates an Ingredient in the saved list.
+  /// Saves a single ingredient (used for batch operations)
+  Future<void> saveIngredient(Ingredient ingredient) async {
+    await _collection.doc(ingredient.id).set(ingredient.toJson());
+  }
+
+  /// Adds or updates an Ingredient.
   Future<void> upsertIngredient(Ingredient ingredient) async {
-    final list = await loadIngredients();
-    final index = list.indexWhere((i) => i.id == ingredient.id);
-    if (index >= 0) {
-      list[index] = ingredient;
-    } else {
-      list.add(ingredient);
-    }
-    await saveIngredients(list);
+    await _collection.doc(ingredient.id).set(ingredient.toJson());
   }
 
   /// Deletes an Ingredient by its id.
   Future<void> deleteIngredient(String id) async {
-    final list = await loadIngredients();
-    list.removeWhere((i) => i.id == id);
-    await saveIngredients(list);
+    await _collection.doc(id).delete();
   }
 
   /// Overwrite saved ingredients with the built-in defaults.
   Future<void> resetToDefaults() async {
-    await saveIngredients(defaultIngredients);
+    // Delete all existing
+    final snapshot = await _collection.get();
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+
+    // Seed defaults
+    await _seedDefaults();
   }
 
-  /// TEMP/utility: remove the storage key entirely.
-  /// Next call to [loadIngredients] will re-seed defaults.
-  /// Future<void> clearAllIngredientsStorage() async {
-  ///   final prefs = await SharedPreferences.getInstance();
-  ///   await prefs.remove(_storageKey);
-  /// }
+  // Keep this for backwards compatibility, but it's not used with Firestore
+  Future<void> saveIngredients(List<Ingredient> ingredients) async {
+    final batch = _firestore.batch();
+    for (final ingredient in ingredients) {
+      batch.set(_collection.doc(ingredient.id), ingredient.toJson());
+    }
+    await batch.commit();
+  }
 }

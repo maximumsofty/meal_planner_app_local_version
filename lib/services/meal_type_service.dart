@@ -1,48 +1,48 @@
 // lib/services/meal_type_service.dart
 
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/meal_type.dart';
 
-/// Service for loading and saving MealType data locally.
+/// Service for loading and saving MealType data to Firestore.
 class MealTypeService {
-  static const _storageKey = 'meal_types';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  String? get _userId => _auth.currentUser?.uid;
+
+  CollectionReference<Map<String, dynamic>> get _collection {
+    if (_userId == null) throw Exception('User not logged in');
+    return _firestore.collection('users').doc(_userId).collection('mealTypes');
+  }
 
   /// Loads the list of saved MealTypes.
   Future<List<MealType>> loadMealTypes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_storageKey);
-    if (jsonString == null) return [];
-    final List<dynamic> decoded = jsonDecode(jsonString);
-    return decoded
-        .map((e) => MealType.fromJson(e as Map<String, dynamic>))
+    if (_userId == null) return [];
+
+    final snapshot = await _collection.get();
+
+    return snapshot.docs
+        .map((doc) => MealType.fromJson(doc.data()))
         .toList();
   }
 
-  /// Saves the given list of MealTypes.
-  Future<void> saveMealTypes(List<MealType> mealTypes) async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = mealTypes.map((mt) => mt.toJson()).toList();
-    final jsonString = jsonEncode(jsonList);
-    await prefs.setString(_storageKey, jsonString);
-  }
-
-  /// Adds or updates a MealType in the saved list.
+  /// Adds or updates a MealType.
   Future<void> upsertMealType(MealType mealType) async {
-    final list = await loadMealTypes();
-    final index = list.indexWhere((mt) => mt.id == mealType.id);
-    if (index >= 0) {
-      list[index] = mealType;
-    } else {
-      list.add(mealType);
-    }
-    await saveMealTypes(list);
+    await _collection.doc(mealType.id).set(mealType.toJson());
   }
 
   /// Deletes a MealType by its id.
   Future<void> deleteMealType(String id) async {
-    final list = await loadMealTypes();
-    list.removeWhere((mt) => mt.id == id);
-    await saveMealTypes(list);
+    await _collection.doc(id).delete();
+  }
+
+  // Keep for backwards compatibility
+  Future<void> saveMealTypes(List<MealType> mealTypes) async {
+    final batch = _firestore.batch();
+    for (final mealType in mealTypes) {
+      batch.set(_collection.doc(mealType.id), mealType.toJson());
+    }
+    await batch.commit();
   }
 }
