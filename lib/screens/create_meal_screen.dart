@@ -448,6 +448,16 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       _recalcFillerWeights();
     });
 
+    // Force collapse on mobile after draft restore
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ResponsiveUtils.isPhone(context)) {
+        setState(() {
+          _fillersExpanded = false;
+          _mealTypeExpanded = false;
+        });
+      }
+    });
+
     return true;
   }
 
@@ -651,210 +661,11 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
             final ingredients = snap.data![0] as List<Ingredient>;
             final mealTypes = snap.data![1] as List<MealType>;
 
+            final isMobile = ResponsiveUtils.isPhone(context);
+
             return Column(
               children: [
-                // Header card: Meal Type + Remaining + Fillers
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    ResponsiveUtils.containerPadding(context),
-                    12,
-                    ResponsiveUtils.containerPadding(context),
-                    6,
-                  ),
-                  child: Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(ResponsiveUtils.containerPadding(context)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Meal Type (collapsible after selection)
-                          if (_selectedMealType != null && !_mealTypeExpanded) ...[
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Meal Type: ${_selectedMealType!.name}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _mealTypeExpanded = true;
-                                    });
-                                    _persist();
-                                  },
-                                  icon: const Icon(Icons.edit),
-                                  label: const Text('Change'),
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (_selectedMealType == null || _mealTypeExpanded) ...[
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DropdownButtonFormField<MealType>(
-                                    initialValue: _selectedMealType,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Meal Type',
-                                    ),
-                                    items: mealTypes
-                                        .map(
-                                          (mt) => DropdownMenuItem(
-                                            value: mt,
-                                            child: Text(
-                                              '${mt.name}  (${_mealTypeRatio(mt)})',
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (mt) {
-                                      setState(() {
-                                        _selectedMealType = mt;
-                                        if (mt != null && ResponsiveUtils.isPhone(context)) {
-                                          _mealTypeExpanded = false;
-                                        }
-                                      });
-                                      _recalcFillerWeights();
-                                      _persist();
-                                    },
-                                  ),
-                                ),
-                                if (_selectedMealType != null)
-                                  TextButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _mealTypeExpanded = false;
-                                      });
-                                      _persist();
-                                    },
-                                    icon: const Icon(Icons.keyboard_arrow_up),
-                                    label: const Text('Hide'),
-                                  ),
-                              ],
-                            ),
-                          ],
-
-                          // Remaining chips (compact display)
-                          if (_selectedMealType != null) ...[
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _compactRemainChip(
-                                  'C',
-                                  _usedCarbsTotal,
-                                  _selectedMealType!.carbs,
-                                ),
-                                _compactRemainChip(
-                                  'P',
-                                  _usedProteinTotal,
-                                  _selectedMealType!.protein,
-                                ),
-                                _compactRemainChip(
-                                  'F',
-                                  _usedFatTotal,
-                                  _selectedMealType!.fat,
-                                ),
-                              ],
-                            ),
-                          ],
-
-                          if (_selectedMealType != null) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const Text(
-                                  'Auto fillers',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                const Spacer(),
-                                TextButton.icon(
-                                  onPressed: () {
-                                    setState(() {
-                                      _fillersExpanded = !_fillersExpanded;
-                                    });
-                                    _persist();
-                                  },
-                                  icon: Icon(
-                                    _fillersExpanded
-                                        ? Icons.keyboard_arrow_up
-                                        : Icons.keyboard_arrow_down,
-                                  ),
-                                  label: Text(
-                                    _fillersExpanded ? 'Hide' : 'Show',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (_fillersExpanded) ...[
-                              const SizedBox(height: 8),
-                              _fillerPicker(
-                                macro: 'C',
-                                label: 'Carb filler',
-                                current: _fillerCarb?.ingredient,
-                                choices: _singleMacro(ingredients, 'C'),
-                              ),
-                              const SizedBox(height: 8),
-                              _fillerPicker(
-                                macro: 'P',
-                                label: 'Protein filler',
-                                current: _fillerProtein?.ingredient,
-                                choices: _singleMacro(ingredients, 'P'),
-                              ),
-                              const SizedBox(height: 8),
-                              _fillerPicker(
-                                macro: 'F',
-                                label: 'Fat filler',
-                                current: _fillerFat?.ingredient,
-                                choices: _singleMacro(ingredients, 'F'),
-                              ),
-                            ],
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Add ingredient (button on mobile, autocomplete on desktop)
-                if (_selectedMealType != null)
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: ResponsiveUtils.isPhone(context)
-                        ? FilledButton.icon(
-                            onPressed: () => _showIngredientSearchModal(ingredients),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Ingredient'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                            ),
-                          )
-                        : Autocomplete<Ingredient>(
-                            optionsBuilder: (val) => val.text.isEmpty
-                                ? const Iterable<Ingredient>.empty()
-                                : ingredients.where(
-                                    (i) => i.name.toLowerCase().contains(
-                                      val.text.toLowerCase(),
-                                    ),
-                                  ),
-                            displayStringForOption: (i) => i.name,
-                            fieldViewBuilder: (ctx, ctl, focus, _) => TextField(
-                              controller: ctl,
-                              focusNode: focus,
-                              decoration: const InputDecoration(
-                                labelText: 'Add Ingredient',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                            onSelected: _addMainRow,
-                          ),
-                  ),
-                // ── ONE combined scrollable list (fillers → unlocked → locked) ──────────
+                // ── ONE combined scrollable list ──────────
                 Expanded(
                   child: ListView(
                     key: const PageStorageKey(
@@ -862,7 +673,217 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                     ), // KEEP scroll offset
                     controller: _listController,
                     children: [
-                      // Fillers hidden; they still contribute to totals and summary.
+                      // Header card: Meal Type + Remaining + Fillers
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          ResponsiveUtils.containerPadding(context),
+                          12,
+                          ResponsiveUtils.containerPadding(context),
+                          6,
+                        ),
+                        child: Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(ResponsiveUtils.containerPadding(context)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Meal Type (collapsible after selection)
+                                if (_selectedMealType != null && !_mealTypeExpanded) ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Meal Type: ${_selectedMealType!.name}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      TextButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            _mealTypeExpanded = true;
+                                          });
+                                          _persist();
+                                        },
+                                        icon: const Icon(Icons.edit, size: 18),
+                                        label: const Text('Change'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                if (_selectedMealType == null || _mealTypeExpanded) ...[
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: DropdownButtonFormField<MealType>(
+                                          initialValue: _selectedMealType,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Meal Type',
+                                            isDense: true,
+                                          ),
+                                          items: mealTypes
+                                              .map(
+                                                (mt) => DropdownMenuItem(
+                                                  value: mt,
+                                                  child: Text(
+                                                    '${mt.name}  (${_mealTypeRatio(mt)})',
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                          onChanged: (mt) {
+                                            setState(() {
+                                              _selectedMealType = mt;
+                                              if (mt != null && isMobile) {
+                                                _mealTypeExpanded = false;
+                                              }
+                                            });
+                                            _recalcFillerWeights();
+                                            _persist();
+                                          },
+                                        ),
+                                      ),
+                                      if (_selectedMealType != null)
+                                        IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _mealTypeExpanded = false;
+                                            });
+                                            _persist();
+                                          },
+                                          icon: const Icon(Icons.keyboard_arrow_up),
+                                          tooltip: 'Collapse',
+                                        ),
+                                    ],
+                                  ),
+                                ],
+
+                                // Remaining chips (compact display)
+                                if (_selectedMealType != null) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      _compactRemainChip(
+                                        'C',
+                                        _usedCarbsTotal,
+                                        _selectedMealType!.carbs,
+                                      ),
+                                      _compactRemainChip(
+                                        'P',
+                                        _usedProteinTotal,
+                                        _selectedMealType!.protein,
+                                      ),
+                                      _compactRemainChip(
+                                        'F',
+                                        _usedFatTotal,
+                                        _selectedMealType!.fat,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+
+                                if (_selectedMealType != null) ...[
+                                  const SizedBox(height: 8),
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _fillersExpanded = !_fillersExpanded;
+                                      });
+                                      _persist();
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: Row(
+                                        children: [
+                                          const Text(
+                                            'Auto fillers',
+                                            style: TextStyle(fontWeight: FontWeight.w600),
+                                          ),
+                                          const Spacer(),
+                                          Icon(
+                                            _fillersExpanded
+                                                ? Icons.keyboard_arrow_up
+                                                : Icons.keyboard_arrow_down,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _fillersExpanded ? 'Hide' : 'Show',
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.primary,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (_fillersExpanded) ...[
+                                    const SizedBox(height: 8),
+                                    _fillerPicker(
+                                      macro: 'C',
+                                      label: 'Carb filler',
+                                      current: _fillerCarb?.ingredient,
+                                      choices: _singleMacro(ingredients, 'C'),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _fillerPicker(
+                                      macro: 'P',
+                                      label: 'Protein filler',
+                                      current: _fillerProtein?.ingredient,
+                                      choices: _singleMacro(ingredients, 'P'),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _fillerPicker(
+                                      macro: 'F',
+                                      label: 'Fat filler',
+                                      current: _fillerFat?.ingredient,
+                                      choices: _singleMacro(ingredients, 'F'),
+                                    ),
+                                  ],
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Add ingredient (button on mobile, autocomplete on desktop)
+                      if (_selectedMealType != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: isMobile
+                              ? FilledButton.icon(
+                                  onPressed: () => _showIngredientSearchModal(ingredients),
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Add Ingredient'),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(44),
+                                  ),
+                                )
+                              : Autocomplete<Ingredient>(
+                                  optionsBuilder: (val) => val.text.isEmpty
+                                      ? const Iterable<Ingredient>.empty()
+                                      : ingredients.where(
+                                          (i) => i.name.toLowerCase().contains(
+                                            val.text.toLowerCase(),
+                                          ),
+                                        ),
+                                  displayStringForOption: (i) => i.name,
+                                  fieldViewBuilder: (ctx, ctl, focus, _) => TextField(
+                                    controller: ctl,
+                                    focusNode: focus,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Add Ingredient',
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  onSelected: _addMainRow,
+                                ),
+                        ),
 
                       // Unlocked ---------------------------------------------------------
                       if (_selectedMealType != null &&
