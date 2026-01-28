@@ -106,10 +106,25 @@ class _AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final useRail = MediaQuery.of(context).size.width >= 900;
-    final centeredChild = Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100),
-        child: child,
+    final horizontalPad = useRail ? 24.0 : 12.0;
+
+    final centeredChild = SafeArea(
+      top: true,
+      bottom:
+          useRail, // rail view should respect bottom insets; nav bar handles its own
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          horizontalPad,
+          12,
+          horizontalPad,
+          useRail ? 24 : 12,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: child,
+          ),
+        ),
       ),
     );
 

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/ingredient.dart';
 import '../models/meal_ingredient.dart';
+import '../utils/responsive_utils.dart';
 
 class MealIngredientRow extends StatefulWidget {
   final MealIngredient mealIngredient;
@@ -164,64 +165,118 @@ class _MealIngredientRowState extends State<MealIngredientRow> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final useCompactLayout = screenWidth < 380;
+
     return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       leading: IconButton(
         icon: Icon(mi.locked ? Icons.lock : Icons.lock_open),
         onPressed: widget.onLockToggle,
+        tooltip: mi.locked ? 'Unlock' : 'Lock',
       ),
       title: Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Text(ing.name),
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(
+          ing.name,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text('g:'),
-              const SizedBox(width: 4),
-              SizedBox(
-                width: 100,
-                child: TextField(
-                  controller: _gCtl,
-                  focusNode: _gFocus,
-                  enabled: widget.editable,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'^[0-9]{0,5}(\.[0-9]{0,1})?'),
-                    ),
-                  ],
-                  onSubmitted: _weightSubmit,
-                  onTap: () => _selectAll(_gCtl),
-                ),
-              ),
-              const SizedBox(width: 12),
-              _pctField('C', _cPctCtl, ing.carbs == 0, _cFocus),
-              const SizedBox(width: 8),
-              _pctField('P', _pPctCtl, ing.protein == 0, _pFocus),
-              const SizedBox(width: 8),
-              _pctField('F', _fPctCtl, ing.fat == 0, _fFocus),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  'Cal ${mi.calories.toStringAsFixed(1)}',
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      subtitle: useCompactLayout ? _buildCompactLayout() : _buildNormalLayout(),
       trailing: widget.onDelete != null
           ? IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: widget.onDelete,
+              tooltip: 'Remove',
             )
           : null,
+    );
+  }
+
+  /// Compact two-row layout for very narrow screens (< 380px)
+  Widget _buildCompactLayout() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Row 1: Grams field
+        SizedBox(
+          width: 140,
+          child: TextField(
+            controller: _gCtl,
+            focusNode: _gFocus,
+            enabled: widget.editable,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                RegExp(r'^[0-9]{0,5}(\\.[0-9]{0,1})?'),
+              ),
+            ],
+            onSubmitted: _weightSubmit,
+            onTap: () => _selectAll(_gCtl),
+            decoration: const InputDecoration(
+              labelText: 'Grams',
+              isDense: true,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Row 2: Percentages + Calories
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _pctField('C', _cPctCtl, ing.carbs == 0, _cFocus, 75),
+            _pctField('P', _pPctCtl, ing.protein == 0, _pFocus, 75),
+            _pctField('F', _fPctCtl, ing.fat == 0, _fFocus, 75),
+            Text(
+              'Cal ${mi.calories.toStringAsFixed(1)}',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Normal single-row layout for standard screens (>= 380px)
+  Widget _buildNormalLayout() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: 140,
+          child: TextField(
+            controller: _gCtl,
+            focusNode: _gFocus,
+            enabled: widget.editable,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                RegExp(r'^[0-9]{0,5}(\\.[0-9]{0,1})?'),
+              ),
+            ],
+            onSubmitted: _weightSubmit,
+            onTap: () => _selectAll(_gCtl),
+            decoration: const InputDecoration(
+              labelText: 'Grams',
+              isDense: true,
+            ),
+          ),
+        ),
+        _pctField('C', _cPctCtl, ing.carbs == 0, _cFocus, 90),
+        _pctField('P', _pPctCtl, ing.protein == 0, _pFocus, 90),
+        _pctField('F', _fPctCtl, ing.fat == 0, _fFocus, 90),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            'Cal ${mi.calories.toStringAsFixed(1)}',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
+      ],
     );
   }
 
@@ -230,9 +285,10 @@ class _MealIngredientRowState extends State<MealIngredientRow> {
     TextEditingController c,
     bool disabled,
     FocusNode focus,
+    double width,
   ) {
     return SizedBox(
-      width: 70,
+      width: width,
       child: TextField(
         controller: c,
         focusNode: focus,
@@ -240,7 +296,7 @@ class _MealIngredientRowState extends State<MealIngredientRow> {
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [
           FilteringTextInputFormatter.allow(
-            RegExp(r'^[0-9]{0,3}(\.[0-9]{0,1})?'),
+            RegExp(r'^[0-9]{0,3}(\\.[0-9]{0,1})?'),
           ),
         ],
         decoration: InputDecoration(labelText: '$lbl %', isDense: true),

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../models/ingredient.dart';
 import '../services/ingredient_service.dart';
+import '../utils/responsive_utils.dart';
 import 'ingredient_form_screen.dart';
 
 class IngredientsScreen extends StatefulWidget {
@@ -154,11 +155,23 @@ class _IngredientsScreenState extends State<IngredientsScreen> {
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: ElevatedButton.icon(
-                        onPressed: _resetToDefaults,
-                        icon: const Icon(Icons.restore),
-                        label: const Text('Reset to defaults'),
-                      ),
+                      child: ResponsiveUtils.isPhoneSmall(context)
+                          ? ElevatedButton(
+                              onPressed: _resetToDefaults,
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.restore, size: 18),
+                                  SizedBox(width: 4),
+                                  Text('Reset'),
+                                ],
+                              ),
+                            )
+                          : ElevatedButton.icon(
+                              onPressed: _resetToDefaults,
+                              icon: const Icon(Icons.restore),
+                              label: const Text('Reset to defaults'),
+                            ),
                     ),
                   ],
                 ),

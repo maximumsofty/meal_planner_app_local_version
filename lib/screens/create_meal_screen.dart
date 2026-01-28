@@ -13,6 +13,7 @@ import '../models/meal.dart'; // NEW
 import 'dart:convert'; // for jsonEncode/jsonDecode
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/meal_ingredient_row.dart';
+import '../utils/responsive_utils.dart';
 
 class CreateMealScreen extends StatefulWidget {
   final Meal? initialMeal;
@@ -245,10 +246,14 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: Text(isEditing ? 'Save Meal' : 'Save Meal'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: ResponsiveUtils.dialogWidth(context),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               TextField(
                 controller: nameCtl,
                 decoration: const InputDecoration(labelText: 'Meal name'),
@@ -271,7 +276,8 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                   ),
                   contentPadding: EdgeInsets.zero,
                 ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -565,278 +571,287 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
         ],
       ),
 
-      body: FutureBuilder(
-        future: Future.wait([_allIngredientsFuture, _allMealTypesFuture]),
-        builder: (ctx, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return Center(child: Text('Error: ${snap.error}'));
-          }
+      body: SafeArea(
+        child: FutureBuilder(
+          future: Future.wait([_allIngredientsFuture, _allMealTypesFuture]),
+          builder: (ctx, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snap.hasError) {
+              return Center(child: Text('Error: ${snap.error}'));
+            }
 
-          final ingredients = snap.data![0] as List<Ingredient>;
-          final mealTypes = snap.data![1] as List<MealType>;
+            final ingredients = snap.data![0] as List<Ingredient>;
+            final mealTypes = snap.data![1] as List<MealType>;
 
-          return Column(
-            children: [
-              // Header card: Meal Type + Remaining + Fillers
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Meal Type
-                        DropdownButtonFormField<MealType>(
-                          initialValue: _selectedMealType,
-                          decoration: const InputDecoration(
-                            labelText: 'Meal Type',
-                          ),
-                          items: mealTypes
-                              .map(
-                                (mt) => DropdownMenuItem(
-                                  value: mt,
-                                  child: Text(
-                                    '${mt.name}  (${_mealTypeRatio(mt)})',
+            return Column(
+              children: [
+                // Header card: Meal Type + Remaining + Fillers
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    ResponsiveUtils.containerPadding(context),
+                    12,
+                    ResponsiveUtils.containerPadding(context),
+                    6,
+                  ),
+                  child: Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(ResponsiveUtils.containerPadding(context)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Meal Type
+                          DropdownButtonFormField<MealType>(
+                            initialValue: _selectedMealType,
+                            decoration: const InputDecoration(
+                              labelText: 'Meal Type',
+                            ),
+                            items: mealTypes
+                                .map(
+                                  (mt) => DropdownMenuItem(
+                                    value: mt,
+                                    child: Text(
+                                      '${mt.name}  (${_mealTypeRatio(mt)})',
+                                    ),
                                   ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (mt) {
-                            setState(() {
-                              _selectedMealType = mt; // just switch targets
-                            });
-                            _recalcFillerWeights();
-                          },
-                        ),
-
-                        // Remaining chips
-                        if (_selectedMealType != null) ...[
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _remainChip(
-                                'C',
-                                _usedCarbsTotal,
-                                _selectedMealType!.carbs,
-                              ),
-                              _remainChip(
-                                'P',
-                                _usedProteinTotal,
-                                _selectedMealType!.protein,
-                              ),
-                              _remainChip(
-                                'F',
-                                _usedFatTotal,
-                                _selectedMealType!.fat,
-                              ),
-                            ],
+                                )
+                                .toList(),
+                            onChanged: (mt) {
+                              setState(() {
+                                _selectedMealType = mt; // just switch targets
+                              });
+                              _recalcFillerWeights();
+                            },
                           ),
-                        ],
 
-                        if (_selectedMealType != null) ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              const Text(
-                                'Auto fillers',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              const Spacer(),
-                              TextButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _fillersExpanded = !_fillersExpanded;
-                                  });
-                                },
-                                icon: Icon(
-                                  _fillersExpanded
-                                      ? Icons.keyboard_arrow_up
-                                      : Icons.keyboard_arrow_down,
+                          // Remaining chips
+                          if (_selectedMealType != null) ...[
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _remainChip(
+                                  'C',
+                                  _usedCarbsTotal,
+                                  _selectedMealType!.carbs,
                                 ),
-                                label: Text(_fillersExpanded ? 'Hide' : 'Show'),
-                              ),
-                            ],
-                          ),
-                          if (_fillersExpanded) ...[
-                            const SizedBox(height: 8),
-                            _fillerPicker(
-                              macro: 'C',
-                              label: 'Carb filler',
-                              current: _fillerCarb?.ingredient,
-                              choices: _singleMacro(ingredients, 'C'),
-                            ),
-                            const SizedBox(height: 8),
-                            _fillerPicker(
-                              macro: 'P',
-                              label: 'Protein filler',
-                              current: _fillerProtein?.ingredient,
-                              choices: _singleMacro(ingredients, 'P'),
-                            ),
-                            const SizedBox(height: 8),
-                            _fillerPicker(
-                              macro: 'F',
-                              label: 'Fat filler',
-                              current: _fillerFat?.ingredient,
-                              choices: _singleMacro(ingredients, 'F'),
+                                _remainChip(
+                                  'P',
+                                  _usedProteinTotal,
+                                  _selectedMealType!.protein,
+                                ),
+                                _remainChip(
+                                  'F',
+                                  _usedFatTotal,
+                                  _selectedMealType!.fat,
+                                ),
+                              ],
                             ),
                           ],
+
+                          if (_selectedMealType != null) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Text(
+                                  'Auto fillers',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                const Spacer(),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _fillersExpanded = !_fillersExpanded;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _fillersExpanded
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.keyboard_arrow_down,
+                                  ),
+                                  label: Text(
+                                    _fillersExpanded ? 'Hide' : 'Show',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_fillersExpanded) ...[
+                              const SizedBox(height: 8),
+                              _fillerPicker(
+                                macro: 'C',
+                                label: 'Carb filler',
+                                current: _fillerCarb?.ingredient,
+                                choices: _singleMacro(ingredients, 'C'),
+                              ),
+                              const SizedBox(height: 8),
+                              _fillerPicker(
+                                macro: 'P',
+                                label: 'Protein filler',
+                                current: _fillerProtein?.ingredient,
+                                choices: _singleMacro(ingredients, 'P'),
+                              ),
+                              const SizedBox(height: 8),
+                              _fillerPicker(
+                                macro: 'F',
+                                label: 'Fat filler',
+                                current: _fillerFat?.ingredient,
+                                choices: _singleMacro(ingredients, 'F'),
+                              ),
+                            ],
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              // autocomplete adder
-              if (_selectedMealType != null)
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Autocomplete<Ingredient>(
-                    optionsBuilder: (val) => val.text.isEmpty
-                        ? const Iterable<Ingredient>.empty()
-                        : ingredients.where(
-                            (i) => i.name.toLowerCase().contains(
-                              val.text.toLowerCase(),
+                // autocomplete adder
+                if (_selectedMealType != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Autocomplete<Ingredient>(
+                      optionsBuilder: (val) => val.text.isEmpty
+                          ? const Iterable<Ingredient>.empty()
+                          : ingredients.where(
+                              (i) => i.name.toLowerCase().contains(
+                                val.text.toLowerCase(),
+                              ),
+                            ),
+                      displayStringForOption: (i) => i.name,
+                      fieldViewBuilder: (ctx, ctl, focus, _) => TextField(
+                        controller: ctl,
+                        focusNode: focus,
+                        decoration: const InputDecoration(
+                          labelText: 'Add Ingredient',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      onSelected: _addMainRow,
+                    ),
+                  ),
+                // ── ONE combined scrollable list (fillers → unlocked → locked) ──────────
+                Expanded(
+                  child: ListView(
+                    key: const PageStorageKey(
+                      'meal-scroll',
+                    ), // KEEP scroll offset
+                    controller: _listController,
+                    children: [
+                      // Fillers hidden; they still contribute to totals and summary.
+
+                      // Unlocked ---------------------------------------------------------
+                      if (_selectedMealType != null &&
+                          _unlockedMain.isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 4,
+                            horizontal: 12,
+                          ),
+                          child: const Text('Unlocked'),
+                        ),
+                        ..._unlockedMain.map(
+                          (mi) => MealIngredientRow(
+                            key: ValueKey(mi),
+                            mealIngredient: mi,
+                            remainingCarbs: _remainAfterLocked(
+                              _selectedMealType!.carbs,
+                              _lockedCarbs,
+                            ),
+                            remainingProtein: _remainAfterLocked(
+                              _selectedMealType!.protein,
+                              _lockedProtein,
+                            ),
+                            remainingFat: _remainAfterLocked(
+                              _selectedMealType!.fat,
+                              _lockedFat,
+                            ),
+                            editable: true,
+                            onChange: _onRowChanged,
+                            onDelete: () => _removeRow(mi),
+                            onLockToggle: () => _toggleLock(mi),
+                          ),
+                        ),
+                        const Divider(height: 0),
+                      ],
+
+                      // Locked -----------------------------------------------------------
+                      if (_selectedMealType != null &&
+                          _lockedMain.isNotEmpty) ...[
+                        Container(
+                          width: double.infinity,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 4,
+                            horizontal: 12,
+                          ),
+                          child: const Text('Locked'),
+                        ),
+                        ..._lockedMain.map(
+                          (mi) => MealIngredientRow(
+                            key: ValueKey(mi),
+                            mealIngredient: mi,
+                            remainingCarbs: 0,
+                            remainingProtein: 0,
+                            remainingFat: 0,
+                            editable: false,
+                            onChange: _onRowChanged,
+                            onDelete: () =>
+                                _removeRow(mi), // locked rows deletable
+                            onLockToggle: () => _toggleLock(mi),
+                          ),
+                        ),
+                      ],
+                      // Summary ---------------------------------------------------------
+                      ..._summarySection(),
+
+                      // Empty state ------------------------------------------------------
+                      if (_allFillers.isEmpty &&
+                          _unlockedMain.isEmpty &&
+                          _lockedMain.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: Text('No ingredients yet.')),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // ───── Bottom action bar (Save/Reset) ─────
+                if (_selectedMealType != null)
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _showSaveDialog,
+                              icon: const Icon(Icons.save),
+                              label: const Text('Save Meal'),
                             ),
                           ),
-                    displayStringForOption: (i) => i.name,
-                    fieldViewBuilder: (ctx, ctl, focus, _) => TextField(
-                      controller: ctl,
-                      focusNode: focus,
-                      decoration: const InputDecoration(
-                        labelText: 'Add Ingredient',
-                        border: OutlineInputBorder(),
+                          const SizedBox(width: 12),
+                          OutlinedButton.icon(
+                            onPressed: _resetBuilder,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Reset'),
+                          ),
+                        ],
                       ),
                     ),
-                    onSelected: _addMainRow,
                   ),
-                ),
-              // ── ONE combined scrollable list (fillers → unlocked → locked) ──────────
-              Expanded(
-                child: ListView(
-                  key: const PageStorageKey(
-                    'meal-scroll',
-                  ), // KEEP scroll offset
-                  controller: _listController,
-                  children: [
-                    // Fillers hidden; they still contribute to totals and summary.
-
-                    // Unlocked ---------------------------------------------------------
-                    if (_selectedMealType != null &&
-                        _unlockedMain.isNotEmpty) ...[
-                      Container(
-                        width: double.infinity,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 4,
-                          horizontal: 12,
-                        ),
-                        child: const Text('Unlocked'),
-                      ),
-                      ..._unlockedMain.map(
-                        (mi) => MealIngredientRow(
-                          key: ValueKey(mi),
-                          mealIngredient: mi,
-                          remainingCarbs: _remainAfterLocked(
-                            _selectedMealType!.carbs,
-                            _lockedCarbs,
-                          ),
-                          remainingProtein: _remainAfterLocked(
-                            _selectedMealType!.protein,
-                            _lockedProtein,
-                          ),
-                          remainingFat: _remainAfterLocked(
-                            _selectedMealType!.fat,
-                            _lockedFat,
-                          ),
-                          editable: true,
-                          onChange: _onRowChanged,
-                          onDelete: () => _removeRow(mi),
-                          onLockToggle: () => _toggleLock(mi),
-                        ),
-                      ),
-                      const Divider(height: 0),
-                    ],
-
-                    // Locked -----------------------------------------------------------
-                    if (_selectedMealType != null &&
-                        _lockedMain.isNotEmpty) ...[
-                      Container(
-                        width: double.infinity,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 4,
-                          horizontal: 12,
-                        ),
-                        child: const Text('Locked'),
-                      ),
-                      ..._lockedMain.map(
-                        (mi) => MealIngredientRow(
-                          key: ValueKey(mi),
-                          mealIngredient: mi,
-                          remainingCarbs: 0,
-                          remainingProtein: 0,
-                          remainingFat: 0,
-                          editable: false,
-                          onChange: _onRowChanged,
-                          onDelete: () =>
-                              _removeRow(mi), // locked rows deletable
-                          onLockToggle: () => _toggleLock(mi),
-                        ),
-                      ),
-                    ],
-                    // Summary ---------------------------------------------------------
-                    ..._summarySection(),
-
-                    // Empty state ------------------------------------------------------
-                    if (_allFillers.isEmpty &&
-                        _unlockedMain.isEmpty &&
-                        _lockedMain.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: Text('No ingredients yet.')),
-                      ),
-                  ],
-                ),
-              ),
-
-              // ───── Bottom action bar (Save/Reset) ─────
-              if (_selectedMealType != null)
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: _showSaveDialog,
-                            icon: const Icon(Icons.save),
-                            label: const Text('Save Meal'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        OutlinedButton.icon(
-                          onPressed: _resetBuilder,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Reset'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -967,7 +982,11 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
             elevation: 4,
             borderRadius: BorderRadius.circular(8),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240, minWidth: 220),
+              constraints: BoxConstraints(
+                maxHeight: 240,
+                minWidth: ResponsiveUtils.autocompleteMinWidth(context),
+                maxWidth: 400,
+              ),
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 itemCount: list.length,

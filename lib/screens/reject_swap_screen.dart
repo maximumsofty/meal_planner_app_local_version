@@ -9,6 +9,7 @@ import '../models/ingredient.dart';
 import '../models/meal_ingredient.dart';
 import '../services/ingredient_service.dart';
 import '../widgets/meal_ingredient_row.dart';
+import '../utils/responsive_utils.dart';
 
 class RejectSwapScreen extends StatefulWidget {
   const RejectSwapScreen({super.key});
@@ -437,33 +438,35 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Ingredient>>(
-        future: _ingredientsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
+      body: SafeArea(
+        child: FutureBuilder<List<Ingredient>>(
+          future: _ingredientsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
 
-          final ingredients = snapshot.data ?? [];
-          _cachedIngredients = List<Ingredient>.from(ingredients);
-          if (!_draftLoaded) {
-            _draftLoaded = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _loadDraft(List<Ingredient>.from(ingredients));
-            });
-          }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _rejectedCard(ingredients),
-              const SizedBox(height: 16),
-              _builderCard(ingredients),
-            ],
-          );
-        },
+            final ingredients = snapshot.data ?? [];
+            _cachedIngredients = List<Ingredient>.from(ingredients);
+            if (!_draftLoaded) {
+              _draftLoaded = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _loadDraft(List<Ingredient>.from(ingredients));
+              });
+            }
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _rejectedCard(ingredients),
+                const SizedBox(height: 16),
+                _builderCard(ingredients),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -714,6 +717,7 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
   Widget _comparisonChip(String label, double used, double target) {
     final diff = target - used;
     final roundedDiff = double.parse(diff.toStringAsFixed(1));
+    final isNarrow = MediaQuery.of(context).size.width < 380;
 
     final scheme = Theme.of(context).colorScheme;
     late Color background;
@@ -734,8 +738,10 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
       status = '${roundedDiff.toStringAsFixed(1)} left';
     }
 
-    final text =
-        '$label  ${used.toStringAsFixed(1)}/${target.toStringAsFixed(1)}  ($status)';
+    // Simplified text on narrow screens to prevent overflow
+    final text = isNarrow
+        ? '$label ${used.toStringAsFixed(1)}/${target.toStringAsFixed(1)}'
+        : '$label  ${used.toStringAsFixed(1)}/${target.toStringAsFixed(1)}  ($status)';
 
     return Chip(
       label: Text(text),
@@ -831,7 +837,11 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
             elevation: 4,
             borderRadius: BorderRadius.circular(8),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240, minWidth: 220),
+              constraints: BoxConstraints(
+                maxHeight: 240,
+                minWidth: ResponsiveUtils.autocompleteMinWidth(context),
+                maxWidth: 400,
+              ),
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 itemCount: list.length,

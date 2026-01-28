@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/meal.dart';
 import '../services/meal_service.dart';
+import '../utils/responsive_utils.dart';
 
 class SavedMealsScreen extends StatefulWidget {
   const SavedMealsScreen({super.key});
@@ -104,18 +105,35 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
                         ),
                         onPressed: () => _toggleFav(meal.id),
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: 'Edit meal',
-                            icon: const Icon(Icons.edit),
-                            onPressed: () => _editMeal(meal),
+                      trailing: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert),
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            _editMeal(meal);
+                          } else if (value == 'delete') {
+                            _delete(meal.id);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit),
+                                SizedBox(width: 12),
+                                Text('Edit'),
+                              ],
+                            ),
                           ),
-                          IconButton(
-                            tooltip: 'Delete meal',
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _delete(meal.id),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, color: Colors.red),
+                                SizedBox(width: 12),
+                                Text('Delete', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -143,17 +161,23 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
       context: ctx,
       builder: (_) => AlertDialog(
         title: Text(meal.name),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: meal.rows.map((mi) {
-              return ListTile(
-                dense: true,
-                title: Text(mi.ingredient.name),
-                trailing: Text('${mi.weight.toStringAsFixed(1)} g'),
-              );
-            }).toList(),
+        content: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: ResponsiveUtils.dialogWidth(ctx),
+            maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+          ),
+          child: SizedBox(
+            width: ResponsiveUtils.dialogWidth(ctx),
+            child: ListView(
+              shrinkWrap: true,
+              children: meal.rows.map((mi) {
+                return ListTile(
+                  dense: true,
+                  title: Text(mi.ingredient.name),
+                  trailing: Text('${mi.weight.toStringAsFixed(1)} g'),
+                );
+              }).toList(),
+            ),
           ),
         ),
         actions: [
