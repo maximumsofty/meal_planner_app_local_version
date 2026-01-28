@@ -137,6 +137,11 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     return all.where(ok).toList();
   }
 
+  // Default filler names
+  static const _defaultFillerCarb = 'Sugar, white (tbsp)';
+  static const _defaultFillerProtein = 'Resource Instant Protein Powder';
+  static const _defaultFillerFat = 'Olive Oil (cup)';
+
   Future<void> _preselectLastFillers(List<Ingredient> all) async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -148,9 +153,17 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       return null;
     }
 
-    final carb = resolve(prefs.getString(_lastFillerKeyC));
-    final protein = resolve(prefs.getString(_lastFillerKeyP));
-    final fat = resolve(prefs.getString(_lastFillerKeyF));
+    Ingredient? findByName(String name) {
+      for (final ing in all) {
+        if (ing.name == name) return ing;
+      }
+      return null;
+    }
+
+    // Try saved preferences first, fall back to defaults
+    final carb = resolve(prefs.getString(_lastFillerKeyC)) ?? findByName(_defaultFillerCarb);
+    final protein = resolve(prefs.getString(_lastFillerKeyP)) ?? findByName(_defaultFillerProtein);
+    final fat = resolve(prefs.getString(_lastFillerKeyF)) ?? findByName(_defaultFillerFat);
 
     if (carb != null) _chooseFiller('C', carb);
     if (protein != null) _chooseFiller('P', protein);
@@ -338,6 +351,9 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       createdAt: now,
       mealTypeId: _selectedMealType!.id,
       rows: rows,
+      fillerCarbId: _fillerCarb?.ingredient.id,
+      fillerProteinId: _fillerProtein?.ingredient.id,
+      fillerFatId: _fillerFat?.ingredient.id,
     );
 
     if (isEditing && !saveAsNew) {
@@ -464,6 +480,14 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   Future<void> _loadFromMeal(Meal meal, List<Ingredient> allIngredients) async {
     final mealTypes = await _mealTypeService.loadMealTypes();
 
+    Ingredient? findById(String? id) {
+      if (id == null) return null;
+      for (final ing in allIngredients) {
+        if (ing.id == id) return ing;
+      }
+      return null;
+    }
+
     setState(() {
       final idx = mealTypes.indexWhere((mt) => mt.id == meal.mealTypeId);
       if (idx != -1) {
@@ -488,9 +512,21 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
           }),
         );
 
-      _fillerCarb = null;
-      _fillerProtein = null;
-      _fillerFat = null;
+      // Restore filler ingredients from saved meal
+      final fillerC = findById(meal.fillerCarbId);
+      final fillerP = findById(meal.fillerProteinId);
+      final fillerF = findById(meal.fillerFatId);
+
+      _fillerCarb = fillerC == null
+          ? null
+          : (MealIngredient(ingredient: fillerC, weight: 0)..locked = true);
+      _fillerProtein = fillerP == null
+          ? null
+          : (MealIngredient(ingredient: fillerP, weight: 0)..locked = true);
+      _fillerFat = fillerF == null
+          ? null
+          : (MealIngredient(ingredient: fillerF, weight: 0)..locked = true);
+
       _fillersExpanded = true;
       _recalcFillerWeights();
     });

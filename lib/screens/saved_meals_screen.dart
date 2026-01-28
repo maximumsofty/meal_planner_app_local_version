@@ -159,7 +159,8 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
   void _showDetails(BuildContext ctx, Meal meal) {
     showDialog(
       context: ctx,
-      builder: (_) => AlertDialog(
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
         title: Text(meal.name),
         content: ConstrainedBox(
           constraints: BoxConstraints(
@@ -182,7 +183,7 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Close'),
           ),
         ],

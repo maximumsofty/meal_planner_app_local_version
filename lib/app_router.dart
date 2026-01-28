@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -94,11 +96,11 @@ class AppRouter {
 
 // Helper class to convert Stream to Listenable for GoRouter refresh
 class GoRouterRefreshStream extends ChangeNotifier {
-  late final dynamic _subscription;
-
-  GoRouterRefreshStream(Stream<dynamic> stream) {
+  GoRouterRefreshStream(Stream<Object?> stream) {
     _subscription = stream.listen((_) => notifyListeners());
   }
+
+  late final StreamSubscription<Object?> _subscription;
 
   @override
   void dispose() {

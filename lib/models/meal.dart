@@ -9,6 +9,9 @@ class Meal {
   final bool favorite;
   final String mealTypeId; // link to MealType
   final List<MealIngredient> rows; // fillers + main rows in order
+  final String? fillerCarbId; // autofill ingredient IDs
+  final String? fillerProteinId;
+  final String? fillerFatId;
 
   Meal({
     required this.id,
@@ -17,6 +20,9 @@ class Meal {
     required this.favorite,
     required this.mealTypeId,
     required this.rows,
+    this.fillerCarbId,
+    this.fillerProteinId,
+    this.fillerFatId,
   });
 
   factory Meal.fromJson(Map<String, dynamic> j) => Meal(
@@ -33,6 +39,9 @@ class Meal {
           )..locked = e['locked'] as bool,
         )
         .toList(),
+    fillerCarbId: j['fillerCarbId'] as String?,
+    fillerProteinId: j['fillerProteinId'] as String?,
+    fillerFatId: j['fillerFatId'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -50,5 +59,8 @@ class Meal {
           },
         )
         .toList(),
+    if (fillerCarbId != null) 'fillerCarbId': fillerCarbId,
+    if (fillerProteinId != null) 'fillerProteinId': fillerProteinId,
+    if (fillerFatId != null) 'fillerFatId': fillerFatId,
   };
 }
