@@ -14,6 +14,7 @@ class MealIngredientRow extends StatefulWidget {
   final VoidCallback onChange;
   final VoidCallback? onDelete;
   final VoidCallback onLockToggle;
+  final VoidCallback? onTap;
 
   const MealIngredientRow({
     super.key,
@@ -25,6 +26,7 @@ class MealIngredientRow extends StatefulWidget {
     required this.onChange,
     required this.onDelete,
     required this.onLockToggle,
+    this.onTap,
   });
 
   @override
@@ -165,6 +167,12 @@ class _MealIngredientRowState extends State<MealIngredientRow> {
 
   @override
   Widget build(BuildContext context) {
+    // Mobile read-only mode when onTap is provided
+    if (widget.onTap != null) {
+      return _buildReadOnlyRow();
+    }
+
+    // Desktop inline edit mode
     final screenWidth = MediaQuery.of(context).size.width;
     final useCompactLayout = screenWidth < 380;
 
@@ -190,6 +198,56 @@ class _MealIngredientRowState extends State<MealIngredientRow> {
               tooltip: 'Remove',
             )
           : null,
+    );
+  }
+
+  /// Read-only display mode for mobile with tap affordance
+  Widget _buildReadOnlyRow() {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              IconButton(
+                icon: Icon(mi.locked ? Icons.lock : Icons.lock_open),
+                onPressed: widget.onLockToggle,
+                tooltip: mi.locked ? 'Unlock' : 'Lock',
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ing.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${mi.weight.toStringAsFixed(1)}g | '
+                      'C: ${mi.carbs.toStringAsFixed(1)}g | '
+                      'P: ${mi.protein.toStringAsFixed(1)}g | '
+                      'F: ${mi.fat.toStringAsFixed(1)}g | '
+                      'Cal: ${mi.calories.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

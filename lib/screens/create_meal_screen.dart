@@ -13,6 +13,8 @@ import '../models/meal.dart'; // NEW
 import 'dart:convert'; // for jsonEncode/jsonDecode
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/meal_ingredient_row.dart';
+import '../widgets/ingredient_edit_bottom_sheet.dart';
+import '../widgets/ingredient_search_modal.dart';
 import '../utils/responsive_utils.dart';
 
 class CreateMealScreen extends StatefulWidget {
@@ -45,6 +47,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   MealIngredient? _fillerProtein;
   MealIngredient? _fillerFat;
   bool _fillersExpanded = true;
+  bool _mealTypeExpanded = true;
   late final bool _persistDraft;
 
   @override
@@ -54,6 +57,20 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     _listController = ScrollController();
     _allIngredientsFuture = _ingredientService.loadIngredients();
     _allMealTypesFuture = _mealTypeService.loadMealTypes();
+
+    // Collapse sections by default on mobile
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final isMobile = ResponsiveUtils.isPhone(context);
+        if (isMobile) {
+          setState(() {
+            _fillersExpanded = false;
+            _mealTypeExpanded = false;
+          });
+        }
+      }
+    });
+
     _allIngredientsFuture.then((ings) async {
       if (widget.initialMeal != null) {
         await _loadFromMeal(widget.initialMeal!, ings);
@@ -364,6 +381,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       'fillerP': _fillerProtein?.ingredient.toJson(),
       'fillerF': _fillerFat?.ingredient.toJson(),
       'fillersExpanded': _fillersExpanded,
+      'mealTypeExpanded': _mealTypeExpanded,
     };
 
     await prefs.setString(_draftKey, jsonEncode(draft));
@@ -426,6 +444,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
           : (MealIngredient(ingredient: fillerF, weight: 0)..locked = true);
 
       _fillersExpanded = draft['fillersExpanded'] as bool? ?? true;
+      _mealTypeExpanded = draft['mealTypeExpanded'] as bool? ?? true;
       _recalcFillerWeights();
     });
 
@@ -533,6 +552,23 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     _persist();
   }
 
+  Future<void> _showIngredientSearchModal(List<Ingredient> ingredients) async {
+    final selected = await Navigator.push<Ingredient>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => IngredientSearchModal(
+          ingredients: ingredients,
+          title: 'Add Ingredient',
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (selected != null) {
+      _addMainRow(selected);
+    }
+  }
+
   void _toggleLock(MealIngredient mi) {
     setState(() {
       mi.locked = !mi.locked;
@@ -547,6 +583,36 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       _recalcFillerWeights();
     });
     _persist();
+  }
+
+  void _showIngredientEditSheet(MealIngredient mi) {
+    final remainingC = mi.locked
+        ? 0.0
+        : _remainAfterLocked(_selectedMealType!.carbs, _lockedCarbs);
+    final remainingP = mi.locked
+        ? 0.0
+        : _remainAfterLocked(_selectedMealType!.protein, _lockedProtein);
+    final remainingF = mi.locked
+        ? 0.0
+        : _remainAfterLocked(_selectedMealType!.fat, _lockedFat);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => IngredientEditBottomSheet(
+        mealIngredient: mi,
+        remainingCarbs: remainingC,
+        remainingProtein: remainingP,
+        remainingFat: remainingF,
+        onUpdate: _onRowChanged,
+        onDelete: () {
+          Navigator.pop(context);
+          _removeRow(mi);
+        },
+        onLockToggle: () => _toggleLock(mi),
+      ),
+    );
   }
 
   // ─────────────────── UI build ─────────────────────────────────────────
@@ -601,48 +667,96 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Meal Type
-                          DropdownButtonFormField<MealType>(
-                            initialValue: _selectedMealType,
-                            decoration: const InputDecoration(
-                              labelText: 'Meal Type',
-                            ),
-                            items: mealTypes
-                                .map(
-                                  (mt) => DropdownMenuItem(
-                                    value: mt,
-                                    child: Text(
-                                      '${mt.name}  (${_mealTypeRatio(mt)})',
+                          // Meal Type (collapsible after selection)
+                          if (_selectedMealType != null && !_mealTypeExpanded) ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Meal Type: ${_selectedMealType!.name}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
                                     ),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (mt) {
-                              setState(() {
-                                _selectedMealType = mt; // just switch targets
-                              });
-                              _recalcFillerWeights();
-                            },
-                          ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    setState(() {
+                                      _mealTypeExpanded = true;
+                                    });
+                                    _persist();
+                                  },
+                                  icon: const Icon(Icons.edit),
+                                  label: const Text('Change'),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (_selectedMealType == null || _mealTypeExpanded) ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<MealType>(
+                                    initialValue: _selectedMealType,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Meal Type',
+                                    ),
+                                    items: mealTypes
+                                        .map(
+                                          (mt) => DropdownMenuItem(
+                                            value: mt,
+                                            child: Text(
+                                              '${mt.name}  (${_mealTypeRatio(mt)})',
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (mt) {
+                                      setState(() {
+                                        _selectedMealType = mt;
+                                        if (mt != null && ResponsiveUtils.isPhone(context)) {
+                                          _mealTypeExpanded = false;
+                                        }
+                                      });
+                                      _recalcFillerWeights();
+                                      _persist();
+                                    },
+                                  ),
+                                ),
+                                if (_selectedMealType != null)
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _mealTypeExpanded = false;
+                                      });
+                                      _persist();
+                                    },
+                                    icon: const Icon(Icons.keyboard_arrow_up),
+                                    label: const Text('Hide'),
+                                  ),
+                              ],
+                            ),
+                          ],
 
-                          // Remaining chips
+                          // Remaining chips (compact display)
                           if (_selectedMealType != null) ...[
                             const SizedBox(height: 12),
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                _remainChip(
+                                _compactRemainChip(
                                   'C',
                                   _usedCarbsTotal,
                                   _selectedMealType!.carbs,
                                 ),
-                                _remainChip(
+                                _compactRemainChip(
                                   'P',
                                   _usedProteinTotal,
                                   _selectedMealType!.protein,
                                 ),
-                                _remainChip(
+                                _compactRemainChip(
                                   'F',
                                   _usedFatTotal,
                                   _selectedMealType!.fat,
@@ -665,6 +779,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                                     setState(() {
                                       _fillersExpanded = !_fillersExpanded;
                                     });
+                                    _persist();
                                   },
                                   icon: Icon(
                                     _fillersExpanded
@@ -706,29 +821,38 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                     ),
                   ),
                 ),
-                // autocomplete adder
+                // Add ingredient (button on mobile, autocomplete on desktop)
                 if (_selectedMealType != null)
                   Padding(
                     padding: const EdgeInsets.all(8),
-                    child: Autocomplete<Ingredient>(
-                      optionsBuilder: (val) => val.text.isEmpty
-                          ? const Iterable<Ingredient>.empty()
-                          : ingredients.where(
-                              (i) => i.name.toLowerCase().contains(
-                                val.text.toLowerCase(),
+                    child: ResponsiveUtils.isPhone(context)
+                        ? FilledButton.icon(
+                            onPressed: () => _showIngredientSearchModal(ingredients),
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Ingredient'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                            ),
+                          )
+                        : Autocomplete<Ingredient>(
+                            optionsBuilder: (val) => val.text.isEmpty
+                                ? const Iterable<Ingredient>.empty()
+                                : ingredients.where(
+                                    (i) => i.name.toLowerCase().contains(
+                                      val.text.toLowerCase(),
+                                    ),
+                                  ),
+                            displayStringForOption: (i) => i.name,
+                            fieldViewBuilder: (ctx, ctl, focus, _) => TextField(
+                              controller: ctl,
+                              focusNode: focus,
+                              decoration: const InputDecoration(
+                                labelText: 'Add Ingredient',
+                                border: OutlineInputBorder(),
                               ),
                             ),
-                      displayStringForOption: (i) => i.name,
-                      fieldViewBuilder: (ctx, ctl, focus, _) => TextField(
-                        controller: ctl,
-                        focusNode: focus,
-                        decoration: const InputDecoration(
-                          labelText: 'Add Ingredient',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      onSelected: _addMainRow,
-                    ),
+                            onSelected: _addMainRow,
+                          ),
                   ),
                 // ── ONE combined scrollable list (fillers → unlocked → locked) ──────────
                 Expanded(
@@ -755,26 +879,30 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                           child: const Text('Unlocked'),
                         ),
                         ..._unlockedMain.map(
-                          (mi) => MealIngredientRow(
-                            key: ValueKey(mi),
-                            mealIngredient: mi,
-                            remainingCarbs: _remainAfterLocked(
-                              _selectedMealType!.carbs,
-                              _lockedCarbs,
-                            ),
-                            remainingProtein: _remainAfterLocked(
-                              _selectedMealType!.protein,
-                              _lockedProtein,
-                            ),
-                            remainingFat: _remainAfterLocked(
-                              _selectedMealType!.fat,
-                              _lockedFat,
-                            ),
-                            editable: true,
-                            onChange: _onRowChanged,
-                            onDelete: () => _removeRow(mi),
-                            onLockToggle: () => _toggleLock(mi),
-                          ),
+                          (mi) {
+                            final isMobile = ResponsiveUtils.isPhone(context);
+                            return MealIngredientRow(
+                              key: ValueKey(mi),
+                              mealIngredient: mi,
+                              remainingCarbs: _remainAfterLocked(
+                                _selectedMealType!.carbs,
+                                _lockedCarbs,
+                              ),
+                              remainingProtein: _remainAfterLocked(
+                                _selectedMealType!.protein,
+                                _lockedProtein,
+                              ),
+                              remainingFat: _remainAfterLocked(
+                                _selectedMealType!.fat,
+                                _lockedFat,
+                              ),
+                              editable: !isMobile,
+                              onChange: _onRowChanged,
+                              onDelete: isMobile ? null : () => _removeRow(mi),
+                              onLockToggle: () => _toggleLock(mi),
+                              onTap: isMobile ? () => _showIngredientEditSheet(mi) : null,
+                            );
+                          },
                         ),
                         const Divider(height: 0),
                       ],
@@ -794,18 +922,21 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                           child: const Text('Locked'),
                         ),
                         ..._lockedMain.map(
-                          (mi) => MealIngredientRow(
-                            key: ValueKey(mi),
-                            mealIngredient: mi,
-                            remainingCarbs: 0,
-                            remainingProtein: 0,
-                            remainingFat: 0,
-                            editable: false,
-                            onChange: _onRowChanged,
-                            onDelete: () =>
-                                _removeRow(mi), // locked rows deletable
-                            onLockToggle: () => _toggleLock(mi),
-                          ),
+                          (mi) {
+                            final isMobile = ResponsiveUtils.isPhone(context);
+                            return MealIngredientRow(
+                              key: ValueKey(mi),
+                              mealIngredient: mi,
+                              remainingCarbs: 0,
+                              remainingProtein: 0,
+                              remainingFat: 0,
+                              editable: false,
+                              onChange: _onRowChanged,
+                              onDelete: isMobile ? null : () => _removeRow(mi),
+                              onLockToggle: () => _toggleLock(mi),
+                              onTap: isMobile ? () => _showIngredientEditSheet(mi) : null,
+                            );
+                          },
                         ),
                       ],
                       // Summary ---------------------------------------------------------
@@ -857,7 +988,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   }
 
   // ─── small widgets helpers ────────────────────────────────────────────
-  Widget _remainChip(String lbl, double used, double tgt) {
+  Widget _compactRemainChip(String lbl, double used, double tgt) {
     final rawRemain = tgt - used;
     final remainRounded = double.parse(rawRemain.toStringAsFixed(1));
 
@@ -867,29 +998,24 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
 
     Color background;
     Color foreground;
-    String status;
 
     if (isOver) {
       background = scheme.errorContainer;
       foreground = scheme.onErrorContainer;
-      status = '${remainRounded.abs().toStringAsFixed(1)} over';
     } else if (isExact) {
       background = scheme.secondaryContainer;
       foreground = scheme.onSecondaryContainer;
-      status = 'On target';
     } else {
       background = scheme.surfaceContainerHighest;
       foreground = scheme.onSurfaceVariant;
-      status = '${remainRounded.toStringAsFixed(1)} left';
     }
 
-    final text =
-        '$lbl  ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)}  ($status)';
+    final text = '$lbl: ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)}';
 
     return Chip(
       label: Text(text),
       backgroundColor: background,
-      labelStyle: TextStyle(color: foreground),
+      labelStyle: TextStyle(color: foreground, fontSize: 13),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );

@@ -9,6 +9,8 @@ import '../models/ingredient.dart';
 import '../models/meal_ingredient.dart';
 import '../services/ingredient_service.dart';
 import '../widgets/meal_ingredient_row.dart';
+import '../widgets/ingredient_edit_bottom_sheet.dart';
+import '../widgets/ingredient_search_modal.dart';
 import '../utils/responsive_utils.dart';
 
 class RejectSwapScreen extends StatefulWidget {
@@ -44,6 +46,18 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
     super.initState();
     _builderScroll = ScrollController();
     _ingredientsFuture = _ingredientService.loadIngredients();
+
+    // Collapse sections by default on mobile
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final isMobile = ResponsiveUtils.isPhone(context);
+        if (isMobile) {
+          setState(() {
+            _fillersExpanded = false;
+          });
+        }
+      }
+    });
   }
 
   @override
@@ -171,6 +185,57 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
     _recalcFillerWeights();
     setState(() {});
     _persist();
+  }
+
+  void _showIngredientEditSheet(MealIngredient mi) {
+    final remainingC = mi.locked
+        ? 0.0
+        : _remainAfterLocked(_targetCarbs, _sumCarbs(_lockedMain));
+    final remainingP = mi.locked
+        ? 0.0
+        : _remainAfterLocked(_targetProtein, _sumProtein(_lockedMain));
+    final remainingF = mi.locked
+        ? 0.0
+        : _remainAfterLocked(_targetFat, _sumFat(_lockedMain));
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => IngredientEditBottomSheet(
+        mealIngredient: mi,
+        remainingCarbs: remainingC,
+        remainingProtein: remainingP,
+        remainingFat: remainingF,
+        onUpdate: _onRowChanged,
+        onDelete: () {
+          Navigator.pop(context);
+          _removeRow(mi);
+        },
+        onLockToggle: () => _toggleLock(mi),
+      ),
+    );
+  }
+
+  Future<void> _showIngredientSearchModal(
+    List<Ingredient> ingredients,
+    String title,
+    Function(Ingredient) onSelected,
+  ) async {
+    final selected = await Navigator.push<Ingredient>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => IngredientSearchModal(
+          ingredients: ingredients,
+          title: title,
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (selected != null) {
+      onSelected(selected);
+    }
   }
 
   void _recalcFillerWeights() {
@@ -530,14 +595,14 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
               'Replacement Meal',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                _comparisonChip('C', _usedCarbsTotal, _targetCarbs),
-                _comparisonChip('P', _usedProteinTotal, _targetProtein),
-                _comparisonChip('F', _usedFatTotal, _targetFat),
+                _compactComparisonChip('C', _usedCarbsTotal, _targetCarbs),
+                _compactComparisonChip('P', _usedProteinTotal, _targetProtein),
+                _compactComparisonChip('F', _usedFatTotal, _targetFat),
               ],
             ),
             const SizedBox(height: 12),
@@ -615,26 +680,30 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
                         child: const Text('Unlocked'),
                       ),
                       ..._unlockedMain.map(
-                        (mi) => MealIngredientRow(
-                          key: ValueKey(mi),
-                          mealIngredient: mi,
-                          remainingCarbs: _remainAfterLocked(
-                            _targetCarbs,
-                            _sumCarbs(_lockedMain),
-                          ),
-                          remainingProtein: _remainAfterLocked(
-                            _targetProtein,
-                            _sumProtein(_lockedMain),
-                          ),
-                          remainingFat: _remainAfterLocked(
-                            _targetFat,
-                            _sumFat(_lockedMain),
-                          ),
-                          editable: true,
-                          onChange: _onRowChanged,
-                          onDelete: () => _removeRow(mi),
-                          onLockToggle: () => _toggleLock(mi),
-                        ),
+                        (mi) {
+                          final isMobile = ResponsiveUtils.isPhone(context);
+                          return MealIngredientRow(
+                            key: ValueKey(mi),
+                            mealIngredient: mi,
+                            remainingCarbs: _remainAfterLocked(
+                              _targetCarbs,
+                              _sumCarbs(_lockedMain),
+                            ),
+                            remainingProtein: _remainAfterLocked(
+                              _targetProtein,
+                              _sumProtein(_lockedMain),
+                            ),
+                            remainingFat: _remainAfterLocked(
+                              _targetFat,
+                              _sumFat(_lockedMain),
+                            ),
+                            editable: !isMobile,
+                            onChange: _onRowChanged,
+                            onDelete: isMobile ? null : () => _removeRow(mi),
+                            onLockToggle: () => _toggleLock(mi),
+                            onTap: isMobile ? () => _showIngredientEditSheet(mi) : null,
+                          );
+                        },
                       ),
                       const Divider(height: 0),
                     ],
@@ -651,17 +720,21 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
                         child: const Text('Locked'),
                       ),
                       ..._lockedMain.map(
-                        (mi) => MealIngredientRow(
-                          key: ValueKey(mi),
-                          mealIngredient: mi,
-                          remainingCarbs: 0,
-                          remainingProtein: 0,
-                          remainingFat: 0,
-                          editable: false,
-                          onChange: _onRowChanged,
-                          onDelete: () => _removeRow(mi),
-                          onLockToggle: () => _toggleLock(mi),
-                        ),
+                        (mi) {
+                          final isMobile = ResponsiveUtils.isPhone(context);
+                          return MealIngredientRow(
+                            key: ValueKey(mi),
+                            mealIngredient: mi,
+                            remainingCarbs: 0,
+                            remainingProtein: 0,
+                            remainingFat: 0,
+                            editable: false,
+                            onChange: _onRowChanged,
+                            onDelete: isMobile ? null : () => _removeRow(mi),
+                            onLockToggle: () => _toggleLock(mi),
+                            onTap: isMobile ? () => _showIngredientEditSheet(mi) : null,
+                          );
+                        },
                       ),
                     ],
                     const SizedBox(height: 8),
@@ -688,6 +761,18 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
     required List<Ingredient> ingredients,
     required ValueChanged<Ingredient> onSelected,
   }) {
+    // Show full-screen modal on mobile, autocomplete on desktop
+    if (ResponsiveUtils.isPhone(context)) {
+      return FilledButton.icon(
+        onPressed: () => _showIngredientSearchModal(ingredients, label, onSelected),
+        icon: const Icon(Icons.add),
+        label: Text(label),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+        ),
+      );
+    }
+
     return Autocomplete<Ingredient>(
       optionsBuilder: (text) {
         if (text.text.isEmpty) return ingredients;
@@ -714,39 +799,33 @@ class _RejectSwapScreenState extends State<RejectSwapScreen> {
     return Chip(label: Text('$label ${value.toStringAsFixed(1)} g'));
   }
 
-  Widget _comparisonChip(String label, double used, double target) {
+  Widget _compactComparisonChip(String label, double used, double target) {
     final diff = target - used;
     final roundedDiff = double.parse(diff.toStringAsFixed(1));
-    final isNarrow = MediaQuery.of(context).size.width < 380;
 
     final scheme = Theme.of(context).colorScheme;
     late Color background;
     late Color foreground;
-    late String status;
 
     if (roundedDiff < 0) {
       background = scheme.errorContainer;
       foreground = scheme.onErrorContainer;
-      status = '${roundedDiff.abs().toStringAsFixed(1)} over';
     } else if (roundedDiff == 0) {
       background = scheme.secondaryContainer;
       foreground = scheme.onSecondaryContainer;
-      status = 'On target';
     } else {
       background = scheme.surfaceContainerHighest;
       foreground = scheme.onSurfaceVariant;
-      status = '${roundedDiff.toStringAsFixed(1)} left';
     }
 
-    // Simplified text on narrow screens to prevent overflow
-    final text = isNarrow
-        ? '$label ${used.toStringAsFixed(1)}/${target.toStringAsFixed(1)}'
-        : '$label  ${used.toStringAsFixed(1)}/${target.toStringAsFixed(1)}  ($status)';
+    final text = '$label: ${used.toStringAsFixed(1)}/${target.toStringAsFixed(1)}';
 
     return Chip(
       label: Text(text),
       backgroundColor: background,
-      labelStyle: TextStyle(color: foreground),
+      labelStyle: TextStyle(color: foreground, fontSize: 13),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 
