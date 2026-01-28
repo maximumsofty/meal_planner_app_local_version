@@ -1009,6 +1009,14 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
   }
 
   // ─── small widgets helpers ────────────────────────────────────────────
+  String _formatCompact(double value) {
+    // Show integer if whole number, otherwise 1 decimal
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toStringAsFixed(1);
+  }
+
   Widget _compactRemainChip(String lbl, double used, double tgt) {
     final rawRemain = tgt - used;
     final remainRounded = double.parse(rawRemain.toStringAsFixed(1));
@@ -1016,6 +1024,7 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
     final scheme = Theme.of(context).colorScheme;
     final isExact = remainRounded == 0.0;
     final isOver = remainRounded < 0;
+    final isMobile = ResponsiveUtils.isPhone(context);
 
     Color background;
     Color foreground;
@@ -1031,14 +1040,28 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
       foreground = scheme.onSurfaceVariant;
     }
 
-    final text = '$lbl: ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)}';
+    // Compact format on mobile: "C 0/22", full format on desktop: "C: 0.0/22.0"
+    final text = isMobile
+        ? '$lbl ${_formatCompact(used)}/${_formatCompact(tgt)}'
+        : '$lbl: ${used.toStringAsFixed(1)}/${tgt.toStringAsFixed(1)}';
 
-    return Chip(
-      label: Text(text),
-      backgroundColor: background,
-      labelStyle: TextStyle(color: foreground, fontSize: 13),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 6 : 8,
+        vertical: isMobile ? 2 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: foreground,
+          fontSize: isMobile ? 11 : 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 
