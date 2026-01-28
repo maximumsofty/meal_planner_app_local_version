@@ -94,12 +94,11 @@ class AppRouter {
 
 // Helper class to convert Stream to Listenable for GoRouter refresh
 class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    notifyListeners();
-    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
-  }
-
   late final dynamic _subscription;
+
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    _subscription = stream.listen((_) => notifyListeners());
+  }
 
   @override
   void dispose() {

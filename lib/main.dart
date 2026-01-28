@@ -9,13 +9,14 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MealPlannerApp());
+  runApp(MealPlannerApp());
 }
 
 class MealPlannerApp extends StatelessWidget {
-  const MealPlannerApp({super.key});
+  MealPlannerApp({super.key});
 
-  static final _router = AppRouter().router;
+  // Not static - created after Firebase is initialized
+  final _router = AppRouter().router;
 
   @override
   Widget build(BuildContext context) {
