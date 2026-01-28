@@ -1,0 +1,27 @@
+{
+  "name": "meal_planner_app_local_version",
+  "version": "1.0.0",
+  "description": "Keto meal planner built with Flutter; configured for mobile/desktop and now with a web target.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maximumsofty/meal_planner_app_local_version.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/maximumsofty/meal_planner_app_local_version/issues"
+  },
+  "homepage": "https://github.com/maximumsofty/meal_planner_app_local_version#readme",
+  "devDependencies": {
+    "firebase-tools": "^15.4.0"
+  }
+}
