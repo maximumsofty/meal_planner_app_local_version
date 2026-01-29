@@ -112,18 +112,19 @@ class GoRouterRefreshStream extends ChangeNotifier {
 class _NavItem {
   final String path;
   final String label;
+  final String? shortLabel;
   final IconData icon;
 
-  const _NavItem({required this.path, required this.label, required this.icon});
+  const _NavItem({required this.path, required this.label, this.shortLabel, required this.icon});
 }
 
 const _navItems = [
-  _NavItem(path: '/', label: 'Welcome', icon: Icons.home),
-  _NavItem(path: '/create', label: 'Create Meal', icon: Icons.restaurant_menu),
-  _NavItem(path: '/saved', label: 'Saved Meals', icon: Icons.bookmark),
+  _NavItem(path: '/', label: 'Welcome', shortLabel: 'Home', icon: Icons.home),
+  _NavItem(path: '/create', label: 'Create Meal', shortLabel: 'Create', icon: Icons.restaurant_menu),
+  _NavItem(path: '/saved', label: 'Saved Meals', shortLabel: 'Saved', icon: Icons.bookmark),
   _NavItem(path: '/ingredients', label: 'Ingredients', icon: Icons.list_alt),
-  _NavItem(path: '/meal-types', label: 'Meal Types', icon: Icons.view_list),
-  _NavItem(path: '/reject', label: 'Reject Swap', icon: Icons.swap_horiz),
+  _NavItem(path: '/meal-types', label: 'Meal Types', shortLabel: 'Types', icon: Icons.view_list),
+  _NavItem(path: '/reject', label: 'Reject Swap', shortLabel: 'Swap', icon: Icons.swap_horiz),
 ];
 
 class _AppShell extends StatelessWidget {
@@ -248,11 +249,12 @@ class _AppShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => _onSelect(context, index),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         destinations: _navItems
             .map(
               (item) => NavigationDestination(
                 icon: Icon(item.icon),
-                label: item.label,
+                label: item.shortLabel ?? item.label,
               ),
             )
             .toList(),

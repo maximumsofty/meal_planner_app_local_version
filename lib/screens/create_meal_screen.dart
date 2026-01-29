@@ -3,6 +3,7 @@
 // Full Meal-Builder with independent auto-fillers for Carbs / Protein / Fat.
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../models/ingredient.dart';
 import '../models/meal_ingredient.dart';
 import '../models/meal_type.dart';
@@ -753,26 +754,51 @@ class _CreateMealScreenState extends State<CreateMealScreen> {
                                   Row(
                                     children: [
                                       Expanded(
-                                        child: DropdownButtonFormField<MealType>(
-                                          initialValue: _selectedMealType,
+                                        child: DropdownButtonFormField<String>(
+                                          value: _selectedMealType?.id,
                                           decoration: const InputDecoration(
                                             labelText: 'Meal Type',
                                             isDense: true,
                                           ),
-                                          items: mealTypes
-                                              .map(
-                                                (mt) => DropdownMenuItem(
-                                                  value: mt,
-                                                  child: Text(
-                                                    '${mt.name}  (${_mealTypeRatio(mt)})',
-                                                  ),
+                                          items: [
+                                            ...mealTypes.map(
+                                              (mt) => DropdownMenuItem<String>(
+                                                value: mt.id,
+                                                child: Text(
+                                                  '${mt.name}  (${_mealTypeRatio(mt)})',
                                                 ),
-                                              )
-                                              .toList(),
-                                          onChanged: (mt) {
+                                              ),
+                                            ),
+                                            const DropdownMenuItem<String>(
+                                              enabled: false,
+                                              child: Divider(height: 1),
+                                            ),
+                                            DropdownMenuItem<String>(
+                                              value: '__create_new__',
+                                              child: Row(
+                                                children: const [
+                                                  Icon(Icons.add, size: 18),
+                                                  SizedBox(width: 8),
+                                                  Text('Create new meal type'),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                          onChanged: (id) async {
+                                            if (id == '__create_new__') {
+                                              // Navigate to meal types page
+                                              await context.push('/meal-types');
+                                              // Reload meal types after returning
+                                              final updatedTypes = await _mealTypeService.loadMealTypes();
+                                              setState(() {
+                                                _allMealTypesFuture = Future.value(updatedTypes);
+                                              });
+                                              return;
+                                            }
+                                            final mt = mealTypes.firstWhere((m) => m.id == id);
                                             setState(() {
                                               _selectedMealType = mt;
-                                              if (mt != null && isMobile) {
+                                              if (isMobile) {
                                                 _mealTypeExpanded = false;
                                               }
                                             });

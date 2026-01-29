@@ -79,7 +79,13 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
                 final query = _searchCtl.text.toLowerCase();
                 final list = meals
                     .where((m) => m.name.toLowerCase().contains(query))
-                    .toList();
+                    .toList()
+                  ..sort((a, b) {
+                    // Favorites first, then by date (newest first)
+                    if (a.favorite && !b.favorite) return -1;
+                    if (!a.favorite && b.favorite) return 1;
+                    return b.createdAt.compareTo(a.createdAt);
+                  });
 
                 if (list.isEmpty) {
                   return const Center(child: Text('No meals found.'));
