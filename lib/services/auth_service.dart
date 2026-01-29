@@ -23,6 +23,13 @@ class AuthService {
     );
   }
 
+  // Set persistence (stay signed in or session only)
+  Future<void> setPersistence(bool staySignedIn) async {
+    await _auth.setPersistence(
+      staySignedIn ? Persistence.LOCAL : Persistence.SESSION,
+    );
+  }
+
   // Sign in with email and password
   Future<UserCredential> signIn({
     required String email,

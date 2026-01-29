@@ -17,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLogin = true;
   bool _isLoading = false;
+  bool _staySignedIn = true;
   String? _errorMessage;
 
   @override
@@ -35,6 +36,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // Set persistence based on "stay signed in" preference
+      await _authService.setPersistence(_staySignedIn);
+
       if (_isLogin) {
         await _authService.signIn(
           email: _emailController.text.trim(),
@@ -164,58 +168,89 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // Email field
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.email_outlined),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Please enter a valid email';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                    // Email and password fields with autofill support
+                    AutofillGroup(
+                      child: Column(
+                        children: [
+                          // Email field
+                          TextFormField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [
+                              AutofillHints.email,
+                              AutofillHints.username,
+                            ],
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.email_outlined),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!value.contains('@')) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
 
-                    // Password field
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.lock_outlined),
+                          // Password field
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: true,
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.password],
+                            decoration: const InputDecoration(
+                              labelText: 'Password',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.lock_outlined),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your password';
+                              }
+                              if (!_isLogin && value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                            onFieldSubmitted: (_) => _submit(),
+                          ),
+                        ],
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        if (!_isLogin && value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                      onFieldSubmitted: (_) => _submit(),
                     ),
 
-                    // Forgot password (login only)
+                    // Stay signed in checkbox (login only)
                     if (_isLogin) ...[
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _resetPassword,
-                          child: const Text('Forgot password?'),
-                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _staySignedIn,
+                            onChanged: (value) {
+                              setState(() {
+                                _staySignedIn = value ?? true;
+                              });
+                            },
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _staySignedIn = !_staySignedIn;
+                              });
+                            },
+                            child: const Text('Stay signed in'),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: _resetPassword,
+                            child: const Text('Forgot password?'),
+                          ),
+                        ],
                       ),
                     ] else ...[
                       const SizedBox(height: 16),
