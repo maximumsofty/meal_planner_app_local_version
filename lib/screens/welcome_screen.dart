@@ -38,61 +38,78 @@ class WelcomeScreen extends StatelessWidget {
       ),
     ];
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Welcome! Choose where to start:',
-                style: TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 24),
+    return SingleChildScrollView(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Welcome! Choose where to start:',
+                  style: TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 24),
 
-              // Big Create Meal button
-              SizedBox(
-                height: 80,
-                child: FilledButton.icon(
-                  onPressed: () => context.go('/create'),
-                  icon: const Icon(Icons.restaurant_menu, size: 28),
-                  label: const Text(
-                    'Create Meal',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                // Big Create Meal button
+                SizedBox(
+                  height: 72,
+                  child: FilledButton.icon(
+                    onPressed: () => context.go('/create'),
+                    icon: const Icon(Icons.restaurant_menu, size: 28),
+                    label: const Text(
+                      'Create Meal',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // 4x1 row on wide screens, 2x2 grid on mobile
-              if (isWide)
-                SizedBox(
-                  height: 100,
-                  child: Row(
-                    children: gridButtons
-                        .map((btn) => Expanded(child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: btn,
-                            )))
-                        .toList(),
+                // 4x1 row on wide screens, 2x2 grid on mobile
+                if (isWide)
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: gridButtons
+                          .expand((btn) => [
+                                Expanded(child: btn),
+                                const SizedBox(width: 12),
+                              ])
+                          .take(gridButtons.length * 2 - 1)
+                          .toList(),
+                    ),
+                  )
+                else
+                  Column(
+                    children: [
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: gridButtons[0]),
+                            const SizedBox(width: 16),
+                            Expanded(child: gridButtons[1]),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: gridButtons[2]),
+                            const SizedBox(width: 16),
+                            Expanded(child: gridButtons[3]),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                )
-              else
-                SizedBox(
-                  height: 240,
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 1.2,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: gridButtons,
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -115,27 +132,34 @@ class _GridButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 100),
+      child: Material(
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: colorScheme.primary),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 32, color: colorScheme.primary),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
