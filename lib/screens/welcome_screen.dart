@@ -8,68 +8,93 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth > 600;
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Welcome! Choose where to start:',
-            style: TextStyle(fontSize: 18),
-          ),
-          const SizedBox(height: 24),
+    final gridButtons = [
+      _GridButton(
+        icon: Icons.bookmark,
+        label: 'Saved Meals',
+        onTap: () => context.go('/saved'),
+        colorScheme: colorScheme,
+      ),
+      _GridButton(
+        icon: Icons.list_alt,
+        label: 'Ingredients',
+        onTap: () => context.go('/ingredients'),
+        colorScheme: colorScheme,
+      ),
+      _GridButton(
+        icon: Icons.view_list,
+        label: 'Meal Types',
+        onTap: () => context.go('/meal-types'),
+        colorScheme: colorScheme,
+      ),
+      _GridButton(
+        icon: Icons.swap_horiz,
+        label: 'Reject Swap',
+        onTap: () => context.go('/reject'),
+        colorScheme: colorScheme,
+      ),
+    ];
 
-          // Big Create Meal button
-          SizedBox(
-            height: 80,
-            child: FilledButton.icon(
-              onPressed: () => context.go('/create'),
-              icon: const Icon(Icons.restaurant_menu, size: 28),
-              label: const Text(
-                'Create Meal',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Welcome! Choose where to start:',
+                style: TextStyle(fontSize: 18),
               ),
-            ),
-          ),
-          const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-          // 2x2 Grid of other options
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 1.2,
-              children: [
-                _GridButton(
-                  icon: Icons.bookmark,
-                  label: 'Saved Meals',
-                  onTap: () => context.go('/saved'),
-                  colorScheme: colorScheme,
+              // Big Create Meal button
+              SizedBox(
+                height: 80,
+                child: FilledButton.icon(
+                  onPressed: () => context.go('/create'),
+                  icon: const Icon(Icons.restaurant_menu, size: 28),
+                  label: const Text(
+                    'Create Meal',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
                 ),
-                _GridButton(
-                  icon: Icons.list_alt,
-                  label: 'Ingredients',
-                  onTap: () => context.go('/ingredients'),
-                  colorScheme: colorScheme,
+              ),
+              const SizedBox(height: 24),
+
+              // 4x1 row on wide screens, 2x2 grid on mobile
+              if (isWide)
+                SizedBox(
+                  height: 100,
+                  child: Row(
+                    children: gridButtons
+                        .map((btn) => Expanded(child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: btn,
+                            )))
+                        .toList(),
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 240,
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.2,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: gridButtons,
+                  ),
                 ),
-                _GridButton(
-                  icon: Icons.view_list,
-                  label: 'Meal Types',
-                  onTap: () => context.go('/meal-types'),
-                  colorScheme: colorScheme,
-                ),
-                _GridButton(
-                  icon: Icons.swap_horiz,
-                  label: 'Reject Swap',
-                  onTap: () => context.go('/reject'),
-                  colorScheme: colorScheme,
-                ),
-              ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
