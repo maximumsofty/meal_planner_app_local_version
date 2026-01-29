@@ -1,11 +1,11 @@
 {
-    "name": "Keto Meal Planner",
-    "short_name": "Keto Planner",
+    "name": "Keto Meal Builder",
+    "short_name": "Keto Builder",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0F766E",
     "theme_color": "#0F766E",
-    "description": "Plan keto-friendly meals, ingredients, and macros in the browser.",
+    "description": "Plan keto-friendly meals with automatic macro calculations. Build balanced meals, manage ingredients, and track your nutrition goals.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
