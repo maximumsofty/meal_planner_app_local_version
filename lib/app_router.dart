@@ -196,7 +196,9 @@ class _AppShell extends StatelessWidget {
       ),
     );
 
-    if (useRail) {
+    final isHome = location == '/';
+
+    if (useRail && !isHome) {
       return Scaffold(
         body: Row(
           children: [
@@ -246,19 +248,21 @@ class _AppShell extends StatelessWidget {
         ],
       ),
       body: centeredChild,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => _onSelect(context, index),
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: _navItems
-            .map(
-              (item) => NavigationDestination(
-                icon: Icon(item.icon),
-                label: item.shortLabel ?? item.label,
-              ),
-            )
-            .toList(),
-      ),
+      bottomNavigationBar: isHome
+          ? null
+          : NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (index) => _onSelect(context, index),
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              destinations: _navItems
+                  .map(
+                    (item) => NavigationDestination(
+                      icon: Icon(item.icon),
+                      label: item.shortLabel ?? item.label,
+                    ),
+                  )
+                  .toList(),
+            ),
     );
   }
 }
